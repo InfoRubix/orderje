@@ -29,6 +29,10 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 
 **Rubix (super admin)** at `/admin`: every kedai, 30-day order count, suspend / reactivate.
 
+## Clickable demo
+
+`demo/orderje-demo.html` is a standalone front-end demo with sample data from Ayam Gepuk Netizen (no database, no server). It covers the customer QR menu, kitchen, counter (pay at counter: cash, DuitNow QR, corporate credit), dashboard, recon, brand profile and the menu editor. Open it directly in a browser.
+
 ## Stack
 
 Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Drizzle ORM · MySQL 8 / Aurora MySQL / MariaDB 10.6+ · JWT session cookies (jose) · bcrypt.
