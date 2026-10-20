@@ -1,8 +1,18 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, lt, ne, sql, sum, count } from "drizzle-orm";
-import { db } from "@/db";
-import { orderItems, orders, payments, reconciliations, type CustomerType, type OrderType, type PaymentMethod } from "@/db/schema";
-import { dayRange } from "./time";
+import type { CustomerType, OrderType, PaymentMethod } from "@/db/schema";
+import {
+  getReconciliation,
+  ordersCreatedBetween,
+  ordersPaidBetween,
+  paymentsConfirmedBetween,
+} from "./repo";
+import { getOrderRow } from "./orders";
+import { dayRange, myDate } from "./time";
+
+/**
+ * Firestore has no GROUP BY, so reports read the day's (or range's) documents and add them up here.
+ * A busy kedai does a few hundred orders a day, so even a 30-day dashboard is a few thousand small reads.
+ */
 
 const METHODS: PaymentMethod[] = ["cash", "duitnow_qr", "online", "credit"];
 const zeroMethods = () => ({ cash: 0, duitnow_qr: 0, online: 0, credit: 0 }) as Record<PaymentMethod, number>;
@@ -13,58 +23,34 @@ const zeroMethods = () => ({ cash: 0, duitnow_qr: 0, online: 0, credit: 0 }) as 
  */
 export async function reconSummary(tenantId: string, date: string) {
   const { start, end } = dayRange(date);
-  const inDay = and(eq(payments.tenantId, tenantId), eq(payments.status, "success"), gte(payments.confirmedAt, start), lt(payments.confirmedAt, end));
-
-  const rows = await db
-    .select({ kind: payments.kind, method: payments.method, total: sum(payments.amount), n: count() })
-    .from(payments)
-    .where(inDay)
-    .groupBy(payments.kind, payments.method);
+  const [pays, created, closed] = await Promise.all([
+    paymentsConfirmedBetween(tenantId, start, end),
+    ordersCreatedBetween(tenantId, start, end),
+    getReconciliation(tenantId, date),
+  ]);
 
   const byMethod = zeroMethods();
   const countByMethod = zeroMethods();
   const settlements = zeroMethods();
-  for (const r of rows) {
-    if (r.kind === "order") {
-      byMethod[r.method] += Number(r.total ?? 0);
-      countByMethod[r.method] += Number(r.n);
-    } else settlements[r.method] += Number(r.total ?? 0);
+  for (const p of pays) {
+    if (p.kind === "order") {
+      byMethod[p.method] += p.amount;
+      countByMethod[p.method] += 1;
+    } else settlements[p.method] += p.amount;
   }
 
-  const [open] = await db
-    .select({ n: count() })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.tenantId, tenantId),
-        gte(orders.createdAt, start),
-        lt(orders.createdAt, end),
-        ne(orders.status, "cancelled"),
-        inArray(orders.paymentStatus, ["unpaid", "pending"]),
-      ),
-    );
+  const openOrders = created.filter(
+    (o) => o.status !== "cancelled" && (o.paymentStatus === "unpaid" || o.paymentStatus === "pending"),
+  ).length;
 
-  const cashLines = await db
-    .select({
-      id: payments.id,
-      orderId: payments.orderId,
-      method: payments.method,
-      kind: payments.kind,
-      amount: payments.amount,
-      reference: payments.reference,
-      confirmedAt: payments.confirmedAt,
-      orderNo: orders.orderNo,
-    })
-    .from(payments)
-    .leftJoin(orders, eq(orders.id, payments.orderId))
-    .where(and(inDay, inArray(payments.method, ["duitnow_qr", "online"])))
-    .orderBy(payments.confirmedAt);
-
-  const [closed] = await db
-    .select()
-    .from(reconciliations)
-    .where(and(eq(reconciliations.tenantId, tenantId), eq(reconciliations.businessDate, date)))
-    .limit(1);
+  const electronicPays = pays.filter((p) => p.method === "duitnow_qr" || p.method === "online");
+  const orderNos = new Map<string, number>();
+  await Promise.all(
+    [...new Set(electronicPays.map((p) => p.orderId).filter((id): id is string => Boolean(id)))].map(async (id) => {
+      const o = await getOrderRow(tenantId, id);
+      if (o) orderNos.set(id, o.orderNo);
+    }),
+  );
 
   return {
     date,
@@ -72,115 +58,88 @@ export async function reconSummary(tenantId: string, date: string) {
     countByMethod,
     settlements,
     collected: METHODS.filter((m) => m !== "credit").reduce((s, m) => s + byMethod[m] + settlements[m], 0),
-    openOrders: Number(open?.n ?? 0),
-    electronic: cashLines,
+    openOrders,
+    electronic: electronicPays.map((p) => ({
+      id: p.id,
+      orderId: p.orderId,
+      method: p.method,
+      kind: p.kind,
+      amount: p.amount,
+      reference: p.reference,
+      confirmedAt: p.confirmedAt,
+      orderNo: p.orderId ? (orderNos.get(p.orderId) ?? null) : null,
+    })),
     closed: closed ?? null,
   };
 }
+
+type Bucket = { total: number; n: number };
+function add<K extends string>(m: Partial<Record<K, Bucket>>, k: K, total: number) {
+  const b = (m[k] ??= { total: 0, n: 0 });
+  b.total += total;
+  b.n += 1;
+}
+
+/** Hour of day in Malaysia time. */
+const myHour = (d: Date) => (d.getUTCHours() + 8) % 24;
 
 /** Sales for a date range [from, to] inclusive, counted on orders settled in the range. */
 export async function salesReport(tenantId: string, from: string, to: string) {
   const start = dayRange(from).start;
   const end = dayRange(to).end;
-  const settled = and(
-    eq(orders.tenantId, tenantId),
-    inArray(orders.paymentStatus, ["paid", "credit"]),
-    gte(orders.paidAt, start),
-    lt(orders.paidAt, end),
-  );
+  const [settled, created, pays] = await Promise.all([
+    ordersPaidBetween(tenantId, start, end),
+    ordersCreatedBetween(tenantId, start, end),
+    paymentsConfirmedBetween(tenantId, start, end),
+  ]);
 
-  const [totals] = await db
-    .select({
-      sales: sum(orders.total),
-      subtotal: sum(orders.subtotal),
-      discount: sum(orders.discount),
-      sst: sum(orders.sst),
-      service: sum(orders.serviceCharge),
-      n: count(),
-    })
-    .from(orders)
-    .where(settled);
+  const r = { sales: 0, subtotal: 0, discount: 0, sst: 0, service: 0 };
+  const byType: Partial<Record<OrderType, Bucket>> = {};
+  const byCustomer: Partial<Record<CustomerType, Bucket>> = {};
+  const bySource: Partial<Record<"qr" | "counter", Bucket>> = {};
+  const byMethod: Partial<Record<PaymentMethod, Bucket>> = {};
+  const hours = Array.from({ length: 24 }, (_, h) => ({ h, total: 0, n: 0 }));
+  const days = new Map<string, Bucket>();
+  const items = new Map<string, { name: string; qty: number; total: number }>();
 
-  const byType = await db
-    .select({ k: orders.orderType, total: sum(orders.total), n: count() })
-    .from(orders)
-    .where(settled)
-    .groupBy(orders.orderType);
+  for (const o of settled) {
+    r.sales += o.total;
+    r.subtotal += o.subtotal;
+    r.discount += o.discount;
+    r.sst += o.sst;
+    r.service += o.serviceCharge;
+    add(byType, o.orderType, o.total);
+    add(byCustomer, o.customerType, o.total);
+    add(bySource, o.source, o.total);
+    const paidAt = o.paidAt ?? o.createdAt;
+    hours[myHour(paidAt)].total += o.total;
+    hours[myHour(paidAt)].n += 1;
+    const d = myDate(paidAt);
+    const day = days.get(d) ?? { total: 0, n: 0 };
+    day.total += o.total;
+    day.n += 1;
+    days.set(d, day);
+    for (const it of o.items ?? []) {
+      const row = items.get(it.name) ?? { name: it.name, qty: 0, total: 0 };
+      row.qty += it.qty;
+      row.total += it.lineTotal;
+      items.set(it.name, row);
+    }
+  }
+  for (const p of pays) if (p.kind === "order") add(byMethod, p.method, p.amount);
 
-  const byCustomer = await db
-    .select({ k: orders.customerType, total: sum(orders.total), n: count() })
-    .from(orders)
-    .where(settled)
-    .groupBy(orders.customerType);
+  const cancelled = created.filter((o) => o.status === "cancelled");
 
-  const bySource = await db
-    .select({ k: orders.source, total: sum(orders.total), n: count() })
-    .from(orders)
-    .where(settled)
-    .groupBy(orders.source);
-
-  const methodRows = await db
-    .select({ k: payments.method, total: sum(payments.amount), n: count() })
-    .from(payments)
-    .where(
-      and(
-        eq(payments.tenantId, tenantId),
-        eq(payments.kind, "order"),
-        eq(payments.status, "success"),
-        gte(payments.confirmedAt, start),
-        lt(payments.confirmedAt, end),
-      ),
-    )
-    .groupBy(payments.method);
-
-  // Hour of day in Malaysia time, for the busy-hours chart.
-  const myHour = sql<number>`HOUR(DATE_ADD(${orders.paidAt}, INTERVAL 8 HOUR))`;
-  const byHour = await db
-    .select({ h: myHour, total: sum(orders.total), n: count() })
-    .from(orders)
-    .where(settled)
-    .groupBy(myHour);
-
-  const myDay = sql<string>`DATE_FORMAT(DATE_ADD(${orders.paidAt}, INTERVAL 8 HOUR), '%Y-%m-%d')`;
-  const byDay = await db
-    .select({ d: myDay, total: sum(orders.total), n: count() })
-    .from(orders)
-    .where(settled)
-    .groupBy(myDay)
-    .orderBy(myDay);
-
-  const topItems = await db
-    .select({ name: orderItems.name, qty: sum(orderItems.qty), total: sum(orderItems.lineTotal) })
-    .from(orderItems)
-    .innerJoin(orders, eq(orders.id, orderItems.orderId))
-    .where(settled)
-    .groupBy(orderItems.name)
-    .orderBy(desc(sum(orderItems.qty)))
-    .limit(8);
-
-  const [cancelled] = await db
-    .select({ n: count(), total: sum(orders.total) })
-    .from(orders)
-    .where(and(eq(orders.tenantId, tenantId), eq(orders.status, "cancelled"), gte(orders.createdAt, start), lt(orders.createdAt, end)));
-
-  const num = (v: unknown) => Number(v ?? 0);
   return {
-    sales: num(totals?.sales),
-    subtotal: num(totals?.subtotal),
-    discount: num(totals?.discount),
-    sst: num(totals?.sst),
-    service: num(totals?.service),
-    orders: num(totals?.n),
-    cancelled: { n: num(cancelled?.n), total: num(cancelled?.total) },
-    byType: Object.fromEntries(byType.map((r) => [r.k, { total: num(r.total), n: num(r.n) }])) as Partial<Record<OrderType, { total: number; n: number }>>,
-    byCustomer: Object.fromEntries(byCustomer.map((r) => [r.k, { total: num(r.total), n: num(r.n) }])) as Partial<Record<CustomerType, { total: number; n: number }>>,
-    bySource: Object.fromEntries(bySource.map((r) => [r.k, { total: num(r.total), n: num(r.n) }])) as Partial<Record<"qr" | "counter", { total: number; n: number }>>,
-    byMethod: Object.fromEntries(methodRows.map((r) => [r.k, { total: num(r.total), n: num(r.n) }])) as Partial<Record<PaymentMethod, { total: number; n: number }>>,
-    byHour: Array.from({ length: 24 }, (_, h) => {
-      const r = byHour.find((x) => Number(x.h) === h);
-      return { h, total: num(r?.total), n: num(r?.n) };
-    }),
-    byDay: byDay.map((r) => ({ d: String(r.d), total: num(r.total), n: num(r.n) })),
-    topItems: topItems.map((r) => ({ name: r.name, qty: num(r.qty), total: num(r.total) })),
+    ...r,
+    orders: settled.length,
+    cancelled: { n: cancelled.length, total: cancelled.reduce((s, o) => s + o.total, 0) },
+    byType,
+    byCustomer,
+    bySource,
+    byMethod,
+    byHour: hours,
+    byDay: [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([d, v]) => ({ d, ...v })),
+    topItems: [...items.values()].sort((a, b) => b.qty - a.qty).slice(0, 8),
   };
 }

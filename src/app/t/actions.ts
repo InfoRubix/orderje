@@ -1,10 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { diningTables, tenants } from "@/db/schema";
 import { createOrder, OrderError } from "@/lib/orders";
+import { getTableByToken, getTenantBySlug } from "@/lib/repo";
 
 const schema = z.object({
   slug: z.string().min(1).max(64),
@@ -30,16 +28,12 @@ export async function placeQrOrder(input: z.infer<typeof schema>): Promise<{ tok
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { error: "Something in the cart looks wrong. Refresh and try again." };
   const d = parsed.data;
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.slug, d.slug)).limit(1);
+  const tenant = await getTenantBySlug(d.slug);
   if (!tenant) return { error: "Kedai not found." };
 
   let tableId: string | null = null;
   if (d.table !== "takeaway") {
-    const [t] = await db
-      .select()
-      .from(diningTables)
-      .where(and(eq(diningTables.token, d.table), eq(diningTables.tenantId, tenant.id)))
-      .limit(1);
+    const t = await getTableByToken(tenant.id, d.table);
     if (!t) return { error: "This table QR is not recognised. Ask the counter." };
     tableId = t.id;
   }

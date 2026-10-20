@@ -1,24 +1,19 @@
 import "server-only";
-import { and, asc, eq, inArray, sql, sum } from "drizzle-orm";
-import { db } from "@/db";
-import {
-  categories,
-  customers,
-  diningTables,
-  menuItems,
-  modifierGroups,
-  modifierOptions,
-  orderItems,
-  orders,
-  payments,
-  tenants,
-  type CustomerType,
-  type OrderType,
-  type PaymentMethod,
-  type Tenant,
+import { body, col, fs, read, readAll } from "@/db";
+import type {
+  Category,
+  CustomerType,
+  DiningTable,
+  MenuItem,
+  Order,
+  OrderType,
+  Payment,
+  PaymentMethod,
+  Tenant,
 } from "@/db/schema";
 import { computeTotals } from "./pricing";
 import { cashRound } from "./money";
+import { getCustomer, getTenant, listCategories } from "./repo";
 import { appUrl, token, uid } from "./utils";
 import { createBill, isBillPaid, toyyibpayReady } from "./toyyibpay";
 
@@ -26,25 +21,24 @@ export class OrderError extends Error {}
 
 /* ---------------------------------- Menu ---------------------------------- */
 
+export async function listMenuItems(tenantId: string) {
+  const items = readAll<MenuItem>(await col.of(tenantId, "menuItems").get());
+  return items
+    .map((i) => ({
+      ...i,
+      groups: [...(i.groups ?? [])]
+        .sort((a, b) => a.sort - b.sort)
+        .map((g) => ({ ...g, options: [...g.options].sort((a, b) => a.sort - b.sort) })),
+    }))
+    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+}
+
 export async function loadMenu(tenantId: string, opts: { includeUnavailable?: boolean } = {}) {
-  const [cats, items, groups, options] = await Promise.all([
-    db.select().from(categories).where(eq(categories.tenantId, tenantId)).orderBy(asc(categories.sort), asc(categories.name)),
-    db.select().from(menuItems).where(eq(menuItems.tenantId, tenantId)).orderBy(asc(menuItems.sort), asc(menuItems.name)),
-    db.select().from(modifierGroups).where(eq(modifierGroups.tenantId, tenantId)).orderBy(asc(modifierGroups.sort)),
-    db.select().from(modifierOptions).where(eq(modifierOptions.tenantId, tenantId)).orderBy(asc(modifierOptions.sort)),
-  ]);
-  const groupsByItem = new Map<string, (typeof groups[number] & { options: typeof options })[]>();
-  for (const g of groups) {
-    const list = groupsByItem.get(g.menuItemId) ?? [];
-    list.push({ ...g, options: options.filter((o) => o.groupId === g.id) });
-    groupsByItem.set(g.menuItemId, list);
-  }
+  const [cats, items] = await Promise.all([listCategories(tenantId), listMenuItems(tenantId)]);
   return cats
-    .map((c) => ({
+    .map((c: Category) => ({
       ...c,
-      items: items
-        .filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available))
-        .map((i) => ({ ...i, groups: groupsByItem.get(i.id) ?? [] })),
+      items: items.filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available)),
     }))
     .filter((c) => opts.includeUnavailable || c.items.length > 0);
 }
@@ -74,16 +68,8 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
   if (!lines.length) throw new OrderError("Add at least one item.");
   if (lines.length > 100) throw new OrderError("Too many items in one order.");
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))];
-  const items = await db
-    .select()
-    .from(menuItems)
-    .where(and(eq(menuItems.tenantId, tenantId), inArray(menuItems.id, itemIds)));
-  const groups = items.length
-    ? await db.select().from(modifierGroups).where(inArray(modifierGroups.menuItemId, items.map((i) => i.id)))
-    : [];
-  const opts = groups.length
-    ? await db.select().from(modifierOptions).where(inArray(modifierOptions.groupId, groups.map((g) => g.id)))
-    : [];
+  const snaps = await fs().getAll(...itemIds.map((id) => col.of(tenantId, "menuItems").doc(id)));
+  const items = snaps.map((s) => read<MenuItem>(s)).filter((i): i is MenuItem => Boolean(i));
 
   return lines.map((l) => {
     const item = items.find((i) => i.id === l.menuItemId);
@@ -92,19 +78,21 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
     const qty = Math.trunc(l.qty);
     if (!(qty >= 1 && qty <= 99)) throw new OrderError("Quantity must be between 1 and 99.");
 
+    const groups = item.groups ?? [];
     const chosen = [...new Set(l.optionIds)].map((id) => {
-      const o = opts.find((x) => x.id === id);
-      const g = o && groups.find((x) => x.id === o.groupId && x.menuItemId === item.id);
+      const g = groups.find((x) => x.options.some((o) => o.id === id));
+      const o = g?.options.find((x) => x.id === id);
       if (!o || !g) throw new OrderError(`An add-on for ${item.name} is no longer available.`);
       return { o, g };
     });
-    for (const g of groups.filter((x) => x.menuItemId === item.id)) {
+    for (const g of groups) {
       const n = chosen.filter((c) => c.g.id === g.id).length;
       if (g.required && n === 0) throw new OrderError(`Choose ${g.name} for ${item.name}.`);
       if (n > g.maxSelect) throw new OrderError(`Pick up to ${g.maxSelect} for ${g.name}.`);
     }
     const unitPrice = item.price + chosen.reduce((s, c) => s + c.o.price, 0);
     return {
+      id: uid(),
       menuItemId: item.id,
       name: item.name,
       modifiers: chosen.map((c) => c.o.name).join(", ").slice(0, 255) || null,
@@ -119,47 +107,36 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
 async function resolveCustomer(tenantId: string, type: CustomerType, customerId?: string | null) {
   if (type === "walk_in") return null;
   if (!customerId) throw new OrderError(`Pick which ${type} this order belongs to.`);
-  const [c] = await db
-    .select()
-    .from(customers)
-    .where(and(eq(customers.id, customerId), eq(customers.tenantId, tenantId)))
-    .limit(1);
+  const c = await getCustomer(tenantId, customerId);
   if (!c || !c.active) throw new OrderError("Customer not found.");
   if (c.type !== type) throw new OrderError(`${c.name} is registered as ${c.type}, not ${type}.`);
   return c;
 }
 
 export async function createOrder(input: CreateOrderInput) {
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+  const tenant = await getTenant(input.tenantId);
   if (!tenant || !tenant.active) throw new OrderError("This kedai is not taking orders right now.");
 
-  let table: typeof diningTables.$inferSelect | undefined;
+  let table: DiningTable | undefined;
   if (input.orderType === "dine_in" && input.tableId) {
-    [table] = await db
-      .select()
-      .from(diningTables)
-      .where(and(eq(diningTables.id, input.tableId), eq(diningTables.tenantId, tenant.id)))
-      .limit(1);
+    table = read<DiningTable>(await col.of(tenant.id, "tables").doc(input.tableId).get());
     if (!table || !table.active) throw new OrderError("This table QR is no longer active. Ask the counter.");
   }
 
   const customerType = input.customerType ?? "walk_in";
   const customer = await resolveCustomer(tenant.id, customerType, input.customerId);
-  const lines = await priceLines(tenant.id, input.lines);
-  const subtotal = lines.reduce((s, l) => s + l.lineTotal, 0);
+  const items = await priceLines(tenant.id, input.lines);
+  const subtotal = items.reduce((s, l) => s + l.lineTotal, 0);
   const totals = computeTotals(tenant, subtotal, customerType, input.orderType);
 
   const orderId = uid();
   const publicToken = token(20);
+  const tenantRef = col.tenants().doc(tenant.id);
 
-  await db.transaction(async (tx) => {
-    await tx.update(tenants).set({ orderSeq: sql`${tenants.orderSeq} + 1` }).where(eq(tenants.id, tenant.id));
-    const [{ seq }] = await tx
-      .select({ seq: tenants.orderSeq })
-      .from(tenants)
-      .where(eq(tenants.id, tenant.id));
-    await tx.insert(orders).values({
-      id: orderId,
+  await fs().runTransaction(async (tx) => {
+    const seq = Number((await tx.get(tenantRef)).get("orderSeq") ?? 0) + 1;
+    tx.update(tenantRef, { orderSeq: seq });
+    const order: Omit<Order, "id"> = {
       tenantId: tenant.id,
       orderNo: seq,
       publicToken,
@@ -171,10 +148,17 @@ export async function createOrder(input: CreateOrderInput) {
       customerId: customer?.id ?? null,
       customerName: input.customerName?.trim().slice(0, 120) || customer?.name || null,
       customerPhone: input.customerPhone?.trim().slice(0, 32) || customer?.phone || null,
-      note: input.note?.trim().slice(0, 255) || null,
+      status: "new",
+      paymentStatus: "unpaid",
       ...totals,
-    });
-    await tx.insert(orderItems).values(lines.map((l) => ({ id: uid(), tenantId: tenant.id, orderId, ...l })));
+      rounding: 0,
+      note: input.note?.trim().slice(0, 255) || null,
+      items,
+      createdAt: new Date(),
+      paidAt: null,
+    };
+    tx.create(col.of(tenant.id, "orders").doc(orderId), order);
+    tx.create(col.orderTokens().doc(publicToken), { tenantId: tenant.id, orderId });
   });
 
   return { id: orderId, publicToken };
@@ -193,73 +177,75 @@ export async function setOrderCustomer(
     throw new OrderError("This order is already settled.");
   if (order.paymentStatus === "pending")
     throw new OrderError("Confirm or reject the pending payment before changing the customer.");
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+  const tenant = (await getTenant(tenantId))!;
   const customer = await resolveCustomer(tenantId, customerType, customerId);
   const totals = computeTotals(tenant, order.subtotal, customerType, order.orderType);
-  await db
-    .update(orders)
-    .set({
-      customerType,
-      customerId: customer?.id ?? null,
-      customerName: customer?.name ?? (customerType === "walk_in" ? order.customerName : null),
-      customerPhone: customer?.phone ?? order.customerPhone,
-      ...totals,
-      rounding: 0,
-    })
-    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)));
+  await col.of(tenantId, "orders").doc(orderId).update({
+    customerType,
+    customerId: customer?.id ?? null,
+    customerName: customer?.name ?? (customerType === "walk_in" ? order.customerName : null),
+    customerPhone: customer?.phone ?? order.customerPhone,
+    ...totals,
+    rounding: 0,
+  });
 }
 
-/** Plain queries (no LATERAL joins) so this runs on MySQL 5.7/8, Aurora and MariaDB alike. */
-async function withLines(order: typeof orders.$inferSelect | undefined) {
+async function orderPayments(tenantId: string, orderId: string) {
+  const list = readAll<Payment>(await col.of(tenantId, "payments").where("orderId", "==", orderId).get());
+  return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+async function withPayments(order: Order | undefined) {
   if (!order) return undefined;
-  const [items, pays] = await Promise.all([
-    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
-    db.select().from(payments).where(eq(payments.orderId, order.id)).orderBy(asc(payments.createdAt)),
-  ]);
-  return { ...order, items, payments: pays };
+  return { ...order, payments: await orderPayments(order.tenantId, order.id) };
+}
+
+export async function getOrderRow(tenantId: string, orderId: string) {
+  return read<Order>(await col.of(tenantId, "orders").doc(orderId).get());
 }
 
 export async function getOrder(tenantId: string, orderId: string) {
-  const [o] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)))
-    .limit(1);
-  return withLines(o);
+  return withPayments(await getOrderRow(tenantId, orderId));
 }
 
 export async function getOrderByToken(publicToken: string) {
-  const [o] = await db.select().from(orders).where(eq(orders.publicToken, publicToken)).limit(1);
-  return withLines(o);
+  if (!publicToken || publicToken.includes("/")) return undefined;
+  const ref = await col.orderTokens().doc(publicToken).get();
+  if (!ref.exists) return undefined;
+  return getOrder(String(ref.get("tenantId")), String(ref.get("orderId")));
 }
 
 /* -------------------------------- Payments -------------------------------- */
 
 export async function outstandingCredit(tenantId: string, customerId: string) {
-  const [charged] = await db
-    .select({ v: sum(payments.amount) })
-    .from(payments)
-    .where(
-      and(
-        eq(payments.tenantId, tenantId),
-        eq(payments.customerId, customerId),
-        eq(payments.method, "credit"),
-        eq(payments.status, "success"),
-      ),
-    );
-  const [settled] = await db
-    .select({ v: sum(payments.amount) })
-    .from(payments)
-    .where(
-      and(
-        eq(payments.tenantId, tenantId),
-        eq(payments.customerId, customerId),
-        eq(payments.kind, "settlement"),
-        eq(payments.status, "success"),
-      ),
-    );
-  return Number(charged?.v ?? 0) - Number(settled?.v ?? 0);
+  const list = readAll<Payment>(await col.of(tenantId, "payments").where("customerId", "==", customerId).get());
+  let owing = 0;
+  for (const p of list) {
+    if (p.status !== "success") continue;
+    if (p.method === "credit") owing += p.amount;
+    if (p.kind === "settlement") owing -= p.amount;
+  }
+  return owing;
 }
+
+function newPayment(p: Partial<Payment> & Pick<Payment, "tenantId" | "method" | "status" | "amount">): Omit<Payment, "id"> {
+  return {
+    orderId: null,
+    customerId: null,
+    kind: "order",
+    tendered: null,
+    changeGiven: null,
+    reference: null,
+    gatewayBillCode: null,
+    receivedBy: null,
+    confirmedAt: null,
+    createdAt: new Date(),
+    ...body(p),
+  };
+}
+
+const pendingFor = (tenantId: string, orderId: string) =>
+  col.of(tenantId, "payments").where("orderId", "==", orderId).where("status", "==", "pending");
 
 export type PayInput = {
   tenant: Tenant;
@@ -272,7 +258,7 @@ export type PayInput = {
 
 /** Counter payments: cash, DuitNow QR (cashier confirms the bank notification) and corporate credit. */
 export async function payAtCounter(p: PayInput) {
-  const order = await getOrder(p.tenant.id, p.orderId);
+  const order = await getOrderRow(p.tenant.id, p.orderId);
   if (!order) throw new OrderError("Order not found.");
   if (order.status === "cancelled") throw new OrderError("This order was cancelled.");
   if (order.paymentStatus === "paid" || order.paymentStatus === "credit")
@@ -296,7 +282,8 @@ export async function payAtCounter(p: PayInput) {
   } else if (p.method === "credit") {
     if (order.customerType !== "corporate" || !order.customerId)
       throw new OrderError("Credit is only for corporate customers. Set the customer type first.");
-    const [c] = await db.select().from(customers).where(eq(customers.id, order.customerId));
+    const c = await getCustomer(p.tenant.id, order.customerId);
+    if (!c) throw new OrderError("Customer not found.");
     const owing = await outstandingCredit(p.tenant.id, order.customerId);
     if (c.creditLimit > 0 && owing + order.total > c.creditLimit)
       throw new OrderError(`${c.name} would exceed their credit limit.`);
@@ -304,31 +291,33 @@ export async function payAtCounter(p: PayInput) {
   }
 
   const now = new Date();
-  await db.transaction(async (tx) => {
+  const orderRef = col.of(p.tenant.id, "orders").doc(order.id);
+  await fs().runTransaction(async (tx) => {
+    const fresh = read<Order>(await tx.get(orderRef));
+    if (!fresh || fresh.paymentStatus === "paid" || fresh.paymentStatus === "credit")
+      throw new OrderError("This order is already settled.");
+    if (fresh.total !== order.total) throw new OrderError("The bill changed while you were paying. Check the total and try again.");
     // Any pending online/QR attempt is superseded by the counter payment.
-    await tx
-      .update(payments)
-      .set({ status: "failed" })
-      .where(and(eq(payments.orderId, order.id), eq(payments.status, "pending")));
-    await tx.insert(payments).values({
-      id: uid(),
-      tenantId: p.tenant.id,
-      orderId: order.id,
-      customerId: order.customerId,
-      kind: "order",
-      method: p.method,
-      status: "success",
-      amount,
-      tendered,
-      changeGiven,
-      reference: p.reference?.trim().slice(0, 120) || null,
-      receivedBy: p.userId,
-      confirmedAt: now,
-    });
-    await tx
-      .update(orders)
-      .set({ paymentStatus, paidAt: now, rounding, total: order.total + rounding })
-      .where(eq(orders.id, order.id));
+    const pending = await tx.get(pendingFor(p.tenant.id, order.id));
+    for (const d of pending.docs) tx.update(d.ref, { status: "failed" });
+    tx.create(
+      col.of(p.tenant.id, "payments").doc(uid()),
+      newPayment({
+        tenantId: p.tenant.id,
+        orderId: order.id,
+        customerId: order.customerId,
+        method: p.method,
+        status: "success",
+        amount,
+        tendered,
+        changeGiven,
+        reference: p.reference?.trim().slice(0, 120) || null,
+        receivedBy: p.userId,
+        confirmedAt: now,
+        createdAt: now,
+      }),
+    );
+    tx.update(orderRef, { paymentStatus, paidAt: now, rounding, total: order.total + rounding });
   });
   return { changeGiven, amount };
 }
@@ -337,18 +326,15 @@ export async function payAtCounter(p: PayInput) {
 export async function declareQrPayment(publicToken: string) {
   const order = await getOrderByToken(publicToken);
   if (!order) throw new OrderError("Order not found.");
-  if (order.paymentStatus !== "unpaid") return;
-  await db.transaction(async (tx) => {
-    await tx.insert(payments).values({
-      id: uid(),
-      tenantId: order.tenantId,
-      orderId: order.id,
-      kind: "order",
-      method: "duitnow_qr",
-      status: "pending",
-      amount: order.total,
-    });
-    await tx.update(orders).set({ paymentStatus: "pending" }).where(eq(orders.id, order.id));
+  const orderRef = col.of(order.tenantId, "orders").doc(order.id);
+  await fs().runTransaction(async (tx) => {
+    const fresh = read<Order>(await tx.get(orderRef));
+    if (!fresh || fresh.paymentStatus !== "unpaid" || fresh.status === "cancelled") return;
+    tx.create(
+      col.of(order.tenantId, "payments").doc(uid()),
+      newPayment({ tenantId: order.tenantId, orderId: order.id, method: "duitnow_qr", status: "pending", amount: fresh.total }),
+    );
+    tx.update(orderRef, { paymentStatus: "pending" });
   });
 }
 
@@ -360,34 +346,29 @@ export async function resolvePendingPayment(
   userId: string,
   reference?: string | null,
 ) {
-  const [pay] = await db
-    .select()
-    .from(payments)
-    .where(and(eq(payments.id, paymentId), eq(payments.tenantId, tenantId)))
-    .limit(1);
-  if (!pay || pay.status !== "pending" || !pay.orderId) throw new OrderError("Payment is no longer pending.");
-  if (ok && pay.method === "duitnow_qr" && !reference?.trim())
-    throw new OrderError("Enter the bank reference before confirming.");
+  if (ok && !reference?.trim()) {
+    const pay = read<Payment>(await col.of(tenantId, "payments").doc(paymentId).get());
+    if (pay?.method === "duitnow_qr") throw new OrderError("Enter the bank reference before confirming.");
+  }
+  const payRef = col.of(tenantId, "payments").doc(paymentId);
   const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(payments)
-      .set({
-        status: ok ? "success" : "failed",
-        confirmedAt: ok ? now : null,
-        receivedBy: userId,
-        reference: reference?.trim().slice(0, 120) || pay.reference,
-      })
-      .where(eq(payments.id, pay.id));
-    await tx
-      .update(orders)
-      .set(ok ? { paymentStatus: "paid", paidAt: now } : { paymentStatus: "unpaid" })
-      .where(eq(orders.id, pay.orderId!));
+  await fs().runTransaction(async (tx) => {
+    const pay = read<Payment>(await tx.get(payRef));
+    if (!pay || pay.status !== "pending" || !pay.orderId) throw new OrderError("Payment is no longer pending.");
+    tx.update(payRef, {
+      status: ok ? "success" : "failed",
+      confirmedAt: ok ? now : null,
+      receivedBy: userId,
+      reference: reference?.trim().slice(0, 120) || pay.reference,
+    });
+    tx.update(
+      col.of(tenantId, "orders").doc(pay.orderId),
+      ok ? { paymentStatus: "paid", paidAt: now } : { paymentStatus: "unpaid" },
+    );
   });
 }
 
 /* ----------------------------- Online (gateway) ---------------------------- */
-
 
 export async function startOnlinePayment(publicToken: string) {
   const order = await getOrderByToken(publicToken);
@@ -396,7 +377,7 @@ export async function startOnlinePayment(publicToken: string) {
   if (order.paymentStatus === "paid" || order.paymentStatus === "credit") throw new OrderError("Already paid.");
   if (order.paymentStatus === "pending")
     throw new OrderError("A payment is already waiting for confirmation. Ask the counter if it doesn't clear.");
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, order.tenantId));
+  const tenant = (await getTenant(order.tenantId))!;
   if (!toyyibpayReady(tenant)) throw new OrderError("Online payment isn't set up for this kedai. Pay at the counter.");
 
   const paymentId = uid();
@@ -410,52 +391,66 @@ export async function startOnlinePayment(publicToken: string) {
     payorName: order.customerName,
     payorPhone: order.customerPhone,
   });
-  await db.transaction(async (tx) => {
-    await tx.insert(payments).values({
-      id: paymentId,
-      tenantId: tenant.id,
-      orderId: order.id,
-      customerId: order.customerId,
-      kind: "order",
-      method: "online",
-      status: "pending",
-      amount: order.total,
-      gatewayBillCode: bill.billCode,
-    });
-    await tx.update(orders).set({ paymentStatus: "pending" }).where(eq(orders.id, order.id));
+  const orderRef = col.of(tenant.id, "orders").doc(order.id);
+  await fs().runTransaction(async (tx) => {
+    const fresh = read<Order>(await tx.get(orderRef));
+    if (!fresh || fresh.paymentStatus !== "unpaid") throw new OrderError("This bill was just paid or is being paid.");
+    tx.create(
+      col.of(tenant.id, "payments").doc(paymentId),
+      newPayment({
+        tenantId: tenant.id,
+        orderId: order.id,
+        customerId: order.customerId,
+        method: "online",
+        status: "pending",
+        amount: fresh.total,
+        gatewayBillCode: bill.billCode,
+      }),
+    );
+    tx.create(col.bills().doc(bill.billCode), { tenantId: tenant.id, paymentId });
+    tx.update(orderRef, { paymentStatus: "pending" });
   });
   return bill.paymentUrl;
 }
 
+async function paymentByBill(billCode: string) {
+  if (!billCode || billCode.includes("/")) return undefined;
+  const ref = await col.bills().doc(billCode).get();
+  if (!ref.exists) return undefined;
+  const tenantId = String(ref.get("tenantId"));
+  return read<Payment>(await col.of(tenantId, "payments").doc(String(ref.get("paymentId"))).get());
+}
+
 /** Called from both the gateway callback and the return redirect; idempotent. */
 export async function settleOnlinePayment(billCode: string) {
-  const [pay] = await db.select().from(payments).where(eq(payments.gatewayBillCode, billCode)).limit(1);
+  const pay = await paymentByBill(billCode);
   if (!pay || !pay.orderId) return { ok: false as const };
   if (pay.status === "success") return { ok: true as const, orderId: pay.orderId };
   if (pay.status !== "pending") return { ok: false as const };
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, pay.tenantId));
+  const tenant = (await getTenant(pay.tenantId))!;
   const check = await isBillPaid(tenant, billCode, pay.amount);
   if (!check.paid) return { ok: false as const };
+  const payRef = col.of(pay.tenantId, "payments").doc(pay.id);
   const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(payments)
-      .set({ status: "success", confirmedAt: now, reference: check.reference })
-      .where(and(eq(payments.id, pay.id), eq(payments.status, "pending")));
-    await tx.update(orders).set({ paymentStatus: "paid", paidAt: now }).where(eq(orders.id, pay.orderId!));
+  await fs().runTransaction(async (tx) => {
+    const fresh = read<Payment>(await tx.get(payRef));
+    if (!fresh || fresh.status !== "pending") return;
+    tx.update(payRef, { status: "success", confirmedAt: now, reference: check.reference });
+    tx.update(col.of(pay.tenantId, "orders").doc(pay.orderId!), { paymentStatus: "paid", paidAt: now });
   });
   return { ok: true as const, orderId: pay.orderId };
 }
 
 /** Customer came back from the gateway without paying: free the order for another method. */
 export async function abandonOnlinePayment(billCode: string) {
-  const [pay] = await db.select().from(payments).where(eq(payments.gatewayBillCode, billCode)).limit(1);
+  const pay = await paymentByBill(billCode);
   if (!pay || pay.status !== "pending" || !pay.orderId) return;
-  await db.transaction(async (tx) => {
-    await tx.update(payments).set({ status: "failed" }).where(eq(payments.id, pay.id));
-    await tx
-      .update(orders)
-      .set({ paymentStatus: "unpaid" })
-      .where(and(eq(orders.id, pay.orderId!), eq(orders.paymentStatus, "pending")));
+  const payRef = col.of(pay.tenantId, "payments").doc(pay.id);
+  const orderRef = col.of(pay.tenantId, "orders").doc(pay.orderId);
+  await fs().runTransaction(async (tx) => {
+    const [fresh, order] = await Promise.all([tx.get(payRef), tx.get(orderRef)]);
+    if (fresh.get("status") !== "pending") return;
+    tx.update(payRef, { status: "failed" });
+    if (order.get("paymentStatus") === "pending") tx.update(orderRef, { paymentStatus: "unpaid" });
   });
 }

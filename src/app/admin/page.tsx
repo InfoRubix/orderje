@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { count, desc, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { orders, tenants, users } from "@/db/schema";
+import { col, readAll } from "@/db";
+import type { Tenant } from "@/db/schema";
 import { getSession, isSuperAdmin } from "@/lib/auth";
 import { fmtDateTime } from "@/lib/time";
 import { Badge, Button, PageHeader } from "@/components/ui";
@@ -21,22 +20,25 @@ async function toggleTenant(f: FormData) {
   await guard();
   const id = String(f.get("id"));
   const active = f.get("active") === "true";
-  await db.update(tenants).set({ active }).where(eq(tenants.id, id));
+  const ref = col.tenants().doc(id);
+  if ((await ref.get()).exists) await ref.update({ active });
   revalidatePath("/admin");
 }
 
 export default async function AdminPage() {
   await guard();
   const since = new Date(Date.now() - 30 * 86400000);
-  const list = await db
-    .select({
-      t: tenants,
-      orders30: sql<number>`(select count(*) from ${orders} o where o.tenant_id = ${tenants.id} and o.created_at >= ${since})`,
-      staff: sql<number>`(select count(*) from ${users} u where u.tenant_id = ${tenants.id})`,
-    })
-    .from(tenants)
-    .orderBy(desc(tenants.createdAt));
-  const [{ n }] = await db.select({ n: count() }).from(tenants);
+  const all = readAll<Tenant>(await col.tenants().orderBy("createdAt", "desc").get());
+  const list = await Promise.all(
+    all.map(async (t) => {
+      const [orders30, staff] = await Promise.all([
+        col.of(t.id, "orders").where("createdAt", ">=", since).count().get(),
+        col.users().where("tenantId", "==", t.id).count().get(),
+      ]);
+      return { t, orders30: orders30.data().count, staff: staff.data().count };
+    }),
+  );
+  const n = all.length;
 
   return (
     <main className="mx-auto max-w-5xl p-6 md:p-10">

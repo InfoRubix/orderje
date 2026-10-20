@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { CheckCircle2, ChefHat, Clock, HandPlatter, XCircle } from "lucide-react";
-import { db } from "@/db";
-import { tenants, type OrderStatus } from "@/db/schema";
+import type { OrderStatus } from "@/db/schema";
 import { getOrderByToken } from "@/lib/orders";
+import { getTenant } from "@/lib/repo";
 import { toyyibpayReady } from "@/lib/toyyibpay";
 import { rm } from "@/lib/money";
 import { ORDER_TYPE_LABEL } from "@/lib/pricing";
@@ -26,7 +25,8 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
   const { token } = await params;
   const order = await getOrderByToken(token);
   if (!order) notFound();
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, order.tenantId));
+  const tenant = await getTenant(order.tenantId);
+  if (!tenant) notFound();
   const stepIdx = STEPS.findIndex((s) => s.key === order.status);
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
   const done = order.status === "cancelled" || (order.status === "served" && settled);

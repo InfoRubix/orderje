@@ -2,30 +2,49 @@
 End-to-end test of OrderJe: signup -> QR order -> kitchen -> QR/cash/credit payments
 -> dashboard -> recon -> tenant isolation.
 
-WARNING: drops and recreates the database named in TEST_DB. Never point it at production.
+Runs against the Firestore emulator and WIPES it first. It refuses to run without one.
 
     pip install playwright && playwright install chromium
-    npm run build && npm start            # in another terminal
-    TEST_DB=orderje python3 tests/e2e.py
+    npm run emulators                     # terminal 1
+    npm run build && npm start            # terminal 2 (.env.local points at the emulator)
+    python3 tests/e2e.py
 """
-import re, subprocess, sys
+import json, os, re, subprocess, urllib.request
+from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright, expect
 
-import os
 BASE = os.environ.get("BASE_URL", "http://localhost:3000")
-DB = os.environ.get("TEST_DB", "orderje")
-MYSQL = os.environ.get("MYSQL_CMD", "mysql -uroot").split()
+EMU = os.environ.get("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080")
+PROJECT = os.environ.get("FIREBASE_PROJECT_ID", "demo-orderje")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = os.path.join(ROOT, "test-results")
 QR = os.path.join(SHOTS, "duitnow.png")
-subprocess.run(["mkdir", "-p", SHOTS])
-subprocess.run([*MYSQL, "-e", f"drop database if exists {DB}; create database {DB} character set utf8mb4;"], check=True)
-subprocess.run("set -a && . ./.env.local && npx tsx scripts/migrate.ts", shell=True, check=True, cwd=ROOT)
+os.makedirs(SHOTS, exist_ok=True)
+urllib.request.urlopen(urllib.request.Request(
+    f"http://{EMU}/emulator/v1/projects/{PROJECT}/databases/(default)/documents", method="DELETE"))
 subprocess.run(["node", "-e", f"require('qrcode').toFile({QR!r}, 'DUITNOW-DEMO', {{width: 400}})"], check=True, cwd=ROOT)
 
 
-def sql(q):
-    return subprocess.run([*MYSQL, DB, "-N", "-e", q], capture_output=True, text=True).stdout.strip()
+def dump():
+    env = {**os.environ, "FIRESTORE_EMULATOR_HOST": EMU, "FIREBASE_PROJECT_ID": PROJECT}
+    out = subprocess.run(["node", "tests/fsdump.mjs"], capture_output=True, text=True, cwd=ROOT, env=env, check=True)
+    return json.loads(out.stdout)
+
+
+def docs(collection, **match):
+    """Documents in any collection with this name (e.g. "orders" under any tenant), filtered by field values."""
+    return [d for path, d in dump().items()
+            if path.split("/")[-2] == collection and all(d.get(k) == v for k, v in match.items())]
+
+
+def one(collection, **match):
+    found = docs(collection, **match)
+    assert len(found) == 1, (collection, match, found)
+    return found[0]
+
+
+def pick(d, *keys):
+    return tuple(d[k] for k in keys)
 
 
 def step(name):
@@ -48,9 +67,9 @@ with sync_playwright() as p:
     page.fill("input[name=tables]", "6")
     page.click("button:has-text('Create kedai')")
     page.wait_for_url(f"{BASE}/app")
-    slug = sql("select slug from tenants where name='Restoran Ali Maju'")
+    slug = one("tenants", name="Restoran Ali Maju")["slug"]
     assert slug == "restoran-ali-maju", slug
-    assert sql("select count(*) from menu_items") != "0"
+    assert len(docs("menuItems")) > 0
 
     step("settings: SST 6%, service 10%, DuitNow QR")
     page.goto(f"{BASE}/app/settings")
@@ -61,7 +80,8 @@ with sync_playwright() as p:
     page.set_input_files("input[name=duitnowQr]", QR)
     page.click("button:has-text('Save settings')")
     expect(page.get_by_text("Settings saved.")).to_be_visible()
-    assert sql("select sst_rate, service_charge_rate, duitnow_qr_url is not null from tenants") == "600\t1000\t1"
+    t = one("tenants")
+    assert (t["sstRate"], t["serviceChargeRate"], t["duitnowQrUrl"] is not None) == (600, 1000, True), t
 
     step("add member + corporate customers")
     page.goto(f"{BASE}/app/customers?type=member")
@@ -91,7 +111,7 @@ with sync_playwright() as p:
 
     # ------------------------------------------------------------ customer on phone
     step("customer QR order at Meja 3")
-    token = sql("select token from dining_tables where label='Meja 3'")
+    token = one("tables", label="Meja 3")["token"]
     phone = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
     c = phone.new_page()
     c.on("pageerror", lambda e: errors.append(str(e)))
@@ -114,16 +134,18 @@ with sync_playwright() as p:
     c.wait_for_url(re.compile(r"/o/"))
     expect(c.get_by_text("Order #1")).to_be_visible()
     # subtotal 8.00, service 0.80, sst 6% of 8.80 = 0.53 -> 9.33
-    assert sql("select subtotal, service_charge, sst, total, source, order_type from orders where order_no=1") == "800\t80\t53\t933\tqr\tdine_in", sql("select subtotal, service_charge, sst, total from orders")
+    o1 = one("orders", orderNo=1)
+    assert pick(o1, "subtotal", "serviceCharge", "sst", "total", "source", "orderType") == (800, 80, 53, 933, "qr", "dine_in"), o1
     c.screenshot(path=f"{SHOTS}/04-customer-tracking.png", full_page=True)
     order_url = c.url
 
     step("timestamps stored in UTC")
-    drift = int(sql("select abs(timestampdiff(second, created_at, utc_timestamp())) from orders where order_no=1"))
+    created = datetime.fromisoformat(o1["createdAt"].replace("Z", "+00:00"))
+    drift = abs((datetime.now(timezone.utc) - created).total_seconds())
     assert drift < 120, f"created_at drift {drift}s"
 
     step("price tampering is impossible: server prices from DB")
-    assert sql("select unit_price from order_items where name='Nasi Lemak Biasa'") == "500"
+    assert [i["unitPrice"] for i in o1["items"] if i["name"] == "Nasi Lemak Biasa"] == [500], o1["items"]
 
     step("kitchen board")
     page.goto(f"{BASE}/app/kitchen")
@@ -134,7 +156,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(1500)
     page.get_by_role("button", name="Mark ready").click()
     page.wait_for_timeout(1500)
-    assert sql("select status from orders where order_no=1") == "ready"
+    assert one("orders", orderNo=1)["status"] == "ready"
 
     step("customer sees Ready, pays by DuitNow QR")
     c.reload()
@@ -143,7 +165,7 @@ with sync_playwright() as p:
     c.get_by_role("button", name="I've paid").click()
     expect(c.get_by_text("Waiting for the counter to confirm")).to_be_visible()
     c.screenshot(path=f"{SHOTS}/07-customer-qr-pending.png", full_page=True)
-    assert sql("select payment_status from orders where order_no=1") == "pending"
+    assert one("orders", orderNo=1)["paymentStatus"] == "pending"
 
     step("counter confirms QR with bank ref")
     page.goto(f"{BASE}/app/pos")
@@ -154,7 +176,7 @@ with sync_playwright() as p:
     page.get_by_label("Bank reference").fill("88231")
     page.get_by_role("button", name="Received", exact=True).click()
     page.wait_for_timeout(1500)
-    assert sql("select payment_status from orders where order_no=1") == "paid"
+    assert one("orders", orderNo=1)["paymentStatus"] == "paid"
     c.reload()
     expect(c.get_by_text("Paid. Terima kasih!")).to_be_visible()
 
@@ -169,24 +191,25 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Send to kitchen & bill").click()
     page.wait_for_url(re.compile(r"/app/orders/"))
     # takeaway: no service charge. 2x7.50 + 1.50 = 16.50, sst 0.99 -> 17.49
-    assert sql("select total from orders where order_no=2") == "1749"
+    assert one("orders", orderNo=2)["total"] == 1749
     page.get_by_role("button", name="Member", exact=True).click()
     page.get_by_label("Customer").select_option(label="Siti Member · 0123456789")
     page.get_by_role("button", name="Apply member pricing").click()
     page.wait_for_timeout(1500)
     # 5% off 16.50 = 0.83 -> 15.67, sst 0.94 -> 16.61
-    assert sql("select discount, sst, total, customer_type from orders where order_no=2") == "83\t94\t1661\tmember", sql("select discount, sst, total, customer_type from orders where order_no=2")
+    o2 = one("orders", orderNo=2)
+    assert pick(o2, "discount", "sst", "total", "customerType") == (83, 94, 1661, "member"), o2
     page.get_by_label("Cash received").fill("20")
     expect(page.get_by_text("Change RM 3.40")).to_be_visible()  # cash rounds 16.61 -> 16.60
     page.screenshot(path=f"{SHOTS}/10-payment-panel.png")
     page.get_by_role("button", name=re.compile("^Receive RM 16.60")).click()
     expect(page.get_by_text("Give change")).to_be_visible()
-    assert sql("select total, rounding, payment_status from orders where order_no=2") == "1660\t-1\tpaid"
-    assert sql("select tendered, change_given from payments where method='cash'") == "2000\t340"
+    assert pick(one("orders", orderNo=2), "total", "rounding", "paymentStatus") == (1660, -1, "paid")
+    assert pick(one("payments", method="cash"), "tendered", "changeGiven") == (2000, 340)
     page.screenshot(path=f"{SHOTS}/11-paid-change.png")
 
     step("receipt")
-    rtoken = sql("select public_token from orders where order_no=2")
+    rtoken = one("orders", orderNo=2)["publicToken"]
     r = owner.new_page()
     r.goto(f"{BASE}/r/{rtoken}")
     expect(r.get_by_text("Discount (Member)")).to_be_visible()
@@ -194,7 +217,7 @@ with sync_playwright() as p:
     r.close()
 
     step("corporate credit order + limit + settlement")
-    page.goto(f"{BASE}/app/pos/new?table=" + sql("select id from dining_tables where label='Meja 1'"))
+    page.goto(f"{BASE}/app/pos/new?table=" + one("tables", label="Meja 1")["_id"])
     page.get_by_role("button", name=re.compile("^Mee Goreng Mamak")).click()
     page.get_by_role("button", name="Biasa", exact=True).click()
     page.get_by_role("button", name=re.compile(r"^Add · ")).click()
@@ -206,7 +229,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(1500)
     page.get_by_role("button", name=re.compile("^Charge RM")).click()
     expect(page.get_by_text("Charged to company account")).to_be_visible()
-    assert sql("select payment_status from orders where order_no=3") == "credit"
+    assert one("orders", orderNo=3)["paymentStatus"] == "credit"
 
     step("cashier login + role limits")
     cashier = browser.new_context(viewport={"width": 1280, "height": 800})
@@ -231,12 +254,12 @@ with sync_playwright() as p:
     page.wait_for_url(re.compile(r"/app/orders/"))
     page.goto(f"{BASE}/app/recon")
     expect(page.get_by_text("Can't close yet")).to_be_visible()
-    oid = sql("select id from orders where order_no=4")
+    oid = one("orders", orderNo=4)["_id"]
     page.goto(f"{BASE}/app/orders/{oid}")
     page.once("dialog", lambda d: d.accept())
     page.get_by_role("button", name="Cancel order").click()
     page.wait_for_timeout(1500)
-    assert sql("select status from orders where order_no=4") == "cancelled"
+    assert one("orders", orderNo=4)["status"] == "cancelled"
 
     step("dashboard")
     page.goto(f"{BASE}/app")
@@ -254,7 +277,9 @@ with sync_playwright() as p:
     page.fill("textarea[name=notes]", "10 sen short, probably change")
     page.get_by_role("button", name=re.compile("^Close ")).click()
     page.wait_for_timeout(1500)
-    assert sql("select expected_cash, counted_cash, opening_float, expected_qr, bank_qr, credit_sales from reconciliations") == "1660\t6650\t5000\t933\t933\t" + sql("select total from orders where order_no=3")
+    rec = one("reconciliations")
+    assert pick(rec, "expectedCash", "countedCash", "openingFloat", "expectedQr", "bankQr", "creditSales") == (
+        1660, 6650, 5000, 933, 933, one("orders", orderNo=3)["total"]), rec
     page.reload()
     page.screenshot(path=f"{SHOTS}/15-recon-closed.png", full_page=True)
 

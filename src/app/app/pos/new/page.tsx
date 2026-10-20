@@ -1,8 +1,6 @@
-import { and, asc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { diningTables } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { loadMenu } from "@/lib/orders";
+import { listTables } from "@/lib/repo";
 import { CounterOrder } from "./builder";
 
 export const metadata = { title: "New order" };
@@ -12,11 +10,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const { table } = await searchParams;
   const [menu, tables] = await Promise.all([
     loadMenu(tenant.id),
-    db
-      .select({ id: diningTables.id, label: diningTables.label })
-      .from(diningTables)
-      .where(and(eq(diningTables.tenantId, tenant.id), eq(diningTables.active, true)))
-      .orderBy(asc(diningTables.sort)),
+    listTables(tenant.id, { activeOnly: true }).then((ts) => ts.map((t) => ({ id: t.id, label: t.label }))),
   ]);
   return (
     <CounterOrder

@@ -3,34 +3,34 @@
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db";
-import {
-  categories,
-  customers,
-  diningTables,
-  menuItems,
-  modifierGroups,
-  modifierOptions,
-  orders,
-  payments,
-  reconciliations,
-  tenants,
-  users,
-  type CustomerType,
-  type OrderStatus,
+import { col, fs, isAlreadyExists, read } from "@/db";
+import type {
+  Customer,
+  CustomerType,
+  DiningTable,
+  MenuItem,
+  ModifierGroup,
+  Order,
+  OrderStatus,
+  Payment,
+  Reconciliation,
+  Tenant,
+  User,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import {
   createOrder,
+  getOrderRow,
   OrderError,
   outstandingCredit,
   payAtCounter,
   resolvePendingPayment,
   setOrderCustomer,
 } from "@/lib/orders";
+import { getCustomer, getUserByEmail, isDayClosed, listTables } from "@/lib/repo";
 import { reconSummary } from "@/lib/reports";
+import { seedTables } from "@/lib/seed-menu";
 import { toSen } from "@/lib/money";
 import { isValidDate, myDate } from "@/lib/time";
 import { token, uid } from "@/lib/utils";
@@ -38,12 +38,7 @@ import { token, uid } from "@/lib/utils";
 export type ActionResult = { ok?: boolean; error?: string; message?: string; id?: string } | undefined;
 
 async function assertOpenToday(tenantId: string) {
-  const [closed] = await db
-    .select({ id: reconciliations.id })
-    .from(reconciliations)
-    .where(and(eq(reconciliations.tenantId, tenantId), eq(reconciliations.businessDate, myDate())))
-    .limit(1);
-  if (closed) throw new OrderError("Today is already closed in Recon. Ask the owner to reopen it before taking more payments.");
+  if (await isDayClosed(tenantId, myDate())) throw new OrderError("Today is already closed in Recon. Ask the owner to reopen it before taking more payments.");
 }
 
 function fail(e: unknown): ActionResult {
@@ -77,11 +72,7 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
 
 export async function setOrderStatus(orderId: string, status: OrderStatus): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner", "cashier", "kitchen"]);
-  const [o] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenant.id)))
-    .limit(1);
+  const o = await getOrderRow(tenant.id, orderId);
   if (!o) return { error: "Order not found." };
   if (!NEXT[o.status].includes(status)) return { error: `Can't move a ${o.status} order to ${status}.` };
   if (status === "cancelled") {
@@ -89,12 +80,22 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
     if (o.paymentStatus === "paid" || o.paymentStatus === "credit")
       return { error: "This order is paid. Refund it at the counter first." };
   }
-  await db.update(orders).set({ status }).where(eq(orders.id, o.id));
-  if (status === "cancelled") {
-    await db
-      .update(payments)
-      .set({ status: "failed" })
-      .where(and(eq(payments.orderId, o.id), eq(payments.status, "pending")));
+  const orderRef = col.of(tenant.id, "orders").doc(o.id);
+  try {
+    await fs().runTransaction(async (tx) => {
+      const fresh = read<Order>(await tx.get(orderRef));
+      if (!fresh || fresh.status !== o.status) throw new OrderError("Someone else just updated this order. Refresh and try again.");
+      if (status === "cancelled" && (fresh.paymentStatus === "paid" || fresh.paymentStatus === "credit"))
+        throw new OrderError("This order is paid. Refund it at the counter first.");
+      const pending =
+        status === "cancelled"
+          ? await tx.get(col.of(tenant.id, "payments").where("orderId", "==", o.id).where("status", "==", "pending"))
+          : null;
+      tx.update(orderRef, status === "cancelled" && fresh.paymentStatus === "pending" ? { status, paymentStatus: "unpaid" } : { status });
+      for (const d of pending?.docs ?? []) tx.update(d.ref, { status: "failed" });
+    });
+  } catch (e) {
+    return fail(e);
   }
   revalidatePath("/app/pos");
   revalidatePath(`/app/orders/${o.id}`);
@@ -189,35 +190,23 @@ export async function confirmPending(paymentId: string, ok: boolean, reference: 
 export async function voidPayment(orderId: string, reason: string): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner"]);
   if (!reason.trim()) return { error: "Give a reason for the void." };
-  const [o] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenant.id)))
-    .limit(1);
+  const o = await getOrderRow(tenant.id, orderId);
   if (!o || (o.paymentStatus !== "paid" && o.paymentStatus !== "credit")) return { error: "Nothing to void." };
   const date = myDate(o.paidAt ?? o.createdAt);
-  const [closed] = await db
-    .select({ id: reconciliations.id })
-    .from(reconciliations)
-    .where(and(eq(reconciliations.tenantId, tenant.id), eq(reconciliations.businessDate, date)))
-    .limit(1);
-  if (closed) return { error: `${date} is already closed in Recon. Reopen that day first.` };
-  await db.transaction(async (tx) => {
-    const paid = await tx
-      .select()
-      .from(payments)
-      .where(and(eq(payments.orderId, o.id), eq(payments.status, "success")));
-    for (const p of paid) {
-      await tx
-        .update(payments)
-        .set({ status: "failed", reference: `VOID by ${user.name}: ${reason.trim()}`.slice(0, 120) })
-        .where(eq(payments.id, p.id));
-    }
-    await tx
-      .update(orders)
-      .set({ paymentStatus: "unpaid", paidAt: null, total: o.total - o.rounding, rounding: 0 })
-      .where(eq(orders.id, o.id));
-  });
+  if (await isDayClosed(tenant.id, date)) return { error: `${date} is already closed in Recon. Reopen that day first.` };
+  const orderRef = col.of(tenant.id, "orders").doc(o.id);
+  try {
+    await fs().runTransaction(async (tx) => {
+      const fresh = read<Order>(await tx.get(orderRef));
+      if (!fresh || (fresh.paymentStatus !== "paid" && fresh.paymentStatus !== "credit")) throw new OrderError("Nothing to void.");
+      const paid = await tx.get(col.of(tenant.id, "payments").where("orderId", "==", o.id).where("status", "==", "success"));
+      for (const d of paid.docs)
+        tx.update(d.ref, { status: "failed", reference: `VOID by ${user.name}: ${reason.trim()}`.slice(0, 120) });
+      tx.update(orderRef, { paymentStatus: "unpaid", paidAt: null, total: fresh.total - fresh.rounding, rounding: 0 });
+    });
+  } catch (e) {
+    return fail(e);
+  }
   revalidatePath(`/app/orders/${orderId}`);
   return { ok: true };
 }
@@ -229,14 +218,13 @@ export async function saveCategory(_: ActionResult, f: FormData): Promise<Action
   const name = str(f, "name");
   if (!name) return { error: "Enter a category name." };
   const id = str(f, "id");
+  const cats = col.of(tenant.id, "categories");
   if (id) {
-    await db
-      .update(categories)
-      .set({ name, sort: Number(str(f, "sort") || 0) })
-      .where(and(eq(categories.id, id), eq(categories.tenantId, tenant.id)));
+    if (!(await cats.doc(id).get()).exists) return { error: "Category not found." };
+    await cats.doc(id).update({ name, sort: Number(str(f, "sort") || 0) });
   } else {
-    const existing = await db.select({ id: categories.id }).from(categories).where(eq(categories.tenantId, tenant.id));
-    await db.insert(categories).values({ id: uid(), tenantId: tenant.id, name, sort: existing.length });
+    const existing = (await cats.count().get()).data().count;
+    await cats.doc(uid()).create({ tenantId: tenant.id, name, sort: existing });
   }
   revalidatePath("/app/menu");
   return { ok: true };
@@ -244,13 +232,9 @@ export async function saveCategory(_: ActionResult, f: FormData): Promise<Action
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  const items = await db
-    .select({ id: menuItems.id })
-    .from(menuItems)
-    .where(and(eq(menuItems.categoryId, id), eq(menuItems.tenantId, tenant.id)))
-    .limit(1);
-  if (items.length) return { error: "Move or delete the items in this category first." };
-  await db.delete(categories).where(and(eq(categories.id, id), eq(categories.tenantId, tenant.id)));
+  const items = await col.of(tenant.id, "menuItems").where("categoryId", "==", id).limit(1).get();
+  if (!items.empty) return { error: "Move or delete the items in this category first." };
+  await col.of(tenant.id, "categories").doc(id).delete();
   revalidatePath("/app/menu");
   return { ok: true };
 }
@@ -261,11 +245,8 @@ export async function saveMenuItem(_: ActionResult, f: FormData): Promise<Action
     const name = str(f, "name");
     if (!name) return { error: "Enter the item name." };
     const categoryId = str(f, "categoryId");
-    const [cat] = await db
-      .select()
-      .from(categories)
-      .where(and(eq(categories.id, categoryId), eq(categories.tenantId, tenant.id)));
-    if (!cat) return { error: "Pick a category." };
+    const cat = categoryId ? await col.of(tenant.id, "categories").doc(categoryId).get() : null;
+    if (!cat?.exists) return { error: "Pick a category." };
     const imageUrl = str(f, "imageUrl");
     if (imageUrl && !/^https:\/\//.test(imageUrl)) return { error: "Image link must start with https://" };
     const values = {
@@ -277,13 +258,16 @@ export async function saveMenuItem(_: ActionResult, f: FormData): Promise<Action
       available: bool(f, "available"),
     };
     const id = str(f, "id");
+    const items = col.of(tenant.id, "menuItems");
     if (id) {
-      await db.update(menuItems).set(values).where(and(eq(menuItems.id, id), eq(menuItems.tenantId, tenant.id)));
+      if (!(await items.doc(id).get()).exists) return { error: "Item not found." };
+      await items.doc(id).update(values);
       revalidatePath("/app/menu");
       return { ok: true, message: "Saved." };
     }
     const newId = uid();
-    await db.insert(menuItems).values({ id: newId, tenantId: tenant.id, ...values, sort: 999 });
+    const item: Omit<MenuItem, "id"> = { tenantId: tenant.id, ...values, sort: 999, groups: [] };
+    await items.doc(newId).create(item);
     revalidatePath("/app/menu");
     redirect(`/app/menu/${newId}`);
   } catch (e) {
@@ -293,20 +277,16 @@ export async function saveMenuItem(_: ActionResult, f: FormData): Promise<Action
 
 export async function toggleAvailable(id: string, available: boolean): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner", "cashier"]);
-  await db.update(menuItems).set({ available }).where(and(eq(menuItems.id, id), eq(menuItems.tenantId, tenant.id)));
+  const ref = col.of(tenant.id, "menuItems").doc(id);
+  if (!(await ref.get()).exists) return { error: "Item not found." };
+  await ref.update({ available });
   revalidatePath("/app/menu");
   return { ok: true };
 }
 
 export async function deleteMenuItem(id: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  const groups = await db
-    .select({ id: modifierGroups.id })
-    .from(modifierGroups)
-    .where(and(eq(modifierGroups.menuItemId, id), eq(modifierGroups.tenantId, tenant.id)));
-  if (groups.length) await db.delete(modifierOptions).where(inArray(modifierOptions.groupId, groups.map((g) => g.id)));
-  await db.delete(modifierGroups).where(and(eq(modifierGroups.menuItemId, id), eq(modifierGroups.tenantId, tenant.id)));
-  await db.delete(menuItems).where(and(eq(menuItems.id, id), eq(menuItems.tenantId, tenant.id)));
+  await col.of(tenant.id, "menuItems").doc(id).delete();
   revalidatePath("/app/menu");
   redirect("/app/menu");
 }
@@ -330,36 +310,27 @@ export async function saveModifiers(menuItemId: string, raw: unknown): Promise<A
   const { tenant } = await requireUser(["owner"]);
   try {
     const groups = groupsSchema.parse(raw);
-    const [item] = await db
-      .select()
-      .from(menuItems)
-      .where(and(eq(menuItems.id, menuItemId), eq(menuItems.tenantId, tenant.id)));
+    const itemRef = col.of(tenant.id, "menuItems").doc(menuItemId);
+    const item = read<MenuItem>(await itemRef.get());
     if (!item) return { error: "Item not found." };
     for (const g of groups)
       for (const o of g.options) {
         const p = toSen(o.price || "0");
         if (!Number.isFinite(p) || p < 0) return { error: `Check the price for ${o.name}.` };
       }
-    await db.transaction(async (tx) => {
-      const old = await tx.select({ id: modifierGroups.id }).from(modifierGroups).where(eq(modifierGroups.menuItemId, item.id));
-      if (old.length) await tx.delete(modifierOptions).where(inArray(modifierOptions.groupId, old.map((g) => g.id)));
-      await tx.delete(modifierGroups).where(eq(modifierGroups.menuItemId, item.id));
-      for (const [gi, g] of groups.entries()) {
-        const groupId = uid();
-        await tx.insert(modifierGroups).values({
-          id: groupId,
-          tenantId: tenant.id,
-          menuItemId: item.id,
-          name: g.name,
-          required: g.required,
-          maxSelect: g.maxSelect,
-          sort: gi,
-        });
-        await tx.insert(modifierOptions).values(
-          g.options.map((o, oi) => ({ id: uid(), tenantId: tenant.id, groupId, name: o.name, price: toSen(o.price || "0"), sort: oi })),
-        );
-      }
+    const next: ModifierGroup[] = groups.map((g, gi) => {
+      const groupId = uid();
+      return {
+        id: groupId,
+        menuItemId: item.id,
+        name: g.name,
+        required: g.required,
+        maxSelect: g.maxSelect,
+        sort: gi,
+        options: g.options.map((o, oi) => ({ id: uid(), groupId, name: o.name, price: toSen(o.price || "0"), sort: oi })),
+      };
     });
+    await itemRef.update({ groups: next });
     revalidatePath(`/app/menu/${item.id}`);
     return { ok: true, message: "Add-ons saved." };
   } catch (e) {
@@ -373,31 +344,24 @@ export async function addTables(_: ActionResult, f: FormData): Promise<ActionRes
   const { tenant } = await requireUser(["owner"]);
   const count = Math.min(100, Math.max(1, Number(str(f, "count") || 1)));
   const prefix = str(f, "prefix") || "Meja";
-  const existing = await db.select({ id: diningTables.id }).from(diningTables).where(eq(diningTables.tenantId, tenant.id));
-  const start = existing.length + 1;
-  await db.insert(diningTables).values(
-    Array.from({ length: count }, (_, i) => ({
-      id: uid(),
-      tenantId: tenant.id,
-      label: `${prefix} ${start + i}`.slice(0, 40),
-      token: token(12),
-      sort: start + i,
-    })),
-  );
+  const existing = await listTables(tenant.id);
+  await seedTables(tenant.id, count, existing.length + 1, prefix);
   revalidatePath("/app/tables");
   return { ok: true };
 }
 
 export async function updateTable(id: string, patch: { label?: string; active?: boolean; regenerate?: boolean }): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  const set: Partial<typeof diningTables.$inferInsert> = {};
+  const set: Partial<DiningTable> = {};
   if (patch.label !== undefined) {
     if (!patch.label.trim()) return { error: "Table name can't be empty." };
     set.label = patch.label.trim().slice(0, 40);
   }
   if (patch.active !== undefined) set.active = patch.active;
   if (patch.regenerate) set.token = token(12);
-  await db.update(diningTables).set(set).where(and(eq(diningTables.id, id), eq(diningTables.tenantId, tenant.id)));
+  const ref = col.of(tenant.id, "tables").doc(id);
+  if (!(await ref.get()).exists) return { error: "Table not found." };
+  await ref.update(set);
   revalidatePath("/app/tables");
   return { ok: true };
 }
@@ -420,8 +384,14 @@ export async function saveCustomer(_: ActionResult, f: FormData): Promise<Action
       active: f.has("active") ? f.getAll("active").includes("on") : true,
     };
     const id = str(f, "id");
-    if (id) await db.update(customers).set(values).where(and(eq(customers.id, id), eq(customers.tenantId, tenant.id)));
-    else await db.insert(customers).values({ id: uid(), tenantId: tenant.id, ...values });
+    const list = col.of(tenant.id, "customers");
+    if (id) {
+      if (!(await list.doc(id).get()).exists) return { error: "Customer not found." };
+      await list.doc(id).update(values);
+    } else {
+      const c: Omit<Customer, "id"> = { tenantId: tenant.id, ...values, createdAt: new Date() };
+      await list.doc(uid()).create(c);
+    }
     revalidatePath("/app/customers");
     return { ok: true, message: id ? "Saved." : "Customer added." };
   } catch (e) {
@@ -437,25 +407,28 @@ export async function settleCredit(_: ActionResult, f: FormData): Promise<Action
     const method = str(f, "method") as "cash" | "duitnow_qr" | "online";
     if (!["cash", "duitnow_qr", "online"].includes(method)) return { error: "Pick how they paid." };
     const amount = sen(f, "amount", "amount", false);
-    const [c] = await db
-      .select()
-      .from(customers)
-      .where(and(eq(customers.id, customerId), eq(customers.tenantId, tenant.id)));
+    const c = customerId ? await getCustomer(tenant.id, customerId) : undefined;
     if (!c || c.type !== "corporate") return { error: "Corporate customer not found." };
     const owing = await outstandingCredit(tenant.id, c.id);
     if (amount > owing) return { error: `They only owe ${(owing / 100).toFixed(2)}.` };
-    await db.insert(payments).values({
-      id: uid(),
+    const now = new Date();
+    const pay: Omit<Payment, "id"> = {
       tenantId: tenant.id,
+      orderId: null,
       customerId: c.id,
       kind: "settlement",
       method,
       status: "success",
       amount,
+      tendered: null,
+      changeGiven: null,
       reference: str(f, "reference").slice(0, 120) || null,
+      gatewayBillCode: null,
       receivedBy: user.id,
-      confirmedAt: new Date(),
-    });
+      createdAt: now,
+      confirmedAt: now,
+    };
+    await col.of(tenant.id, "payments").doc(uid()).create(pay);
     revalidatePath("/app/customers");
     return { ok: true, message: "Payment recorded." };
   } catch (e) {
@@ -475,31 +448,48 @@ export async function saveStaff(_: ActionResult, f: FormData): Promise<ActionRes
   if (!name) return { error: "Enter a name." };
   if (!["owner", "cashier", "kitchen"].includes(role)) return { error: "Pick a role." };
   if (!z.string().email().safeParse(email).success) return { error: "Enter a valid email." };
-  const [clash] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(id ? and(eq(users.email, email), ne(users.id, id)) : eq(users.email, email))
-    .limit(1);
-  if (clash) return { error: "That email is already used by another account." };
+  const emailTaken = { error: "That email is already used by another account." };
+  const clash = await getUserByEmail(email);
+  if (clash && clash.id !== id) return emailTaken;
 
-  if (id) {
-    if (id === me.id && role !== "owner") return { error: "You can't remove your own owner role." };
-    const set: Partial<typeof users.$inferInsert> = { name, email, role: role as "owner" };
-    if (password) {
-      if (password.length < 8) return { error: "Password needs at least 8 characters." };
-      set.passwordHash = await bcrypt.hash(password, 10);
+  try {
+    if (id) {
+      if (id === me.id && role !== "owner") return { error: "You can't remove your own owner role." };
+      const set: Partial<User> = { name, email, role: role as "owner" };
+      if (password) {
+        if (password.length < 8) return { error: "Password needs at least 8 characters." };
+        set.passwordHash = await bcrypt.hash(password, 10);
+      }
+      const ref = col.users().doc(id);
+      await fs().runTransaction(async (tx) => {
+        const cur = read<User>(await tx.get(ref));
+        if (!cur || cur.tenantId !== tenant.id) throw new OrderError("Staff not found.");
+        if (cur.email !== email) {
+          tx.create(col.emails().doc(email), { userId: id });
+          tx.delete(col.emails().doc(cur.email));
+        }
+        tx.update(ref, set);
+      });
+    } else {
+      if (password.length < 8) return { error: "Set a password of at least 8 characters." };
+      const newId = uid();
+      const u: Omit<User, "id"> = {
+        tenantId: tenant.id,
+        name,
+        email,
+        role: role as "owner",
+        passwordHash: await bcrypt.hash(password, 10),
+        active: true,
+        createdAt: new Date(),
+      };
+      const batch = fs().batch();
+      batch.create(col.emails().doc(email), { userId: newId });
+      batch.create(col.users().doc(newId), u);
+      await batch.commit();
     }
-    await db.update(users).set(set).where(and(eq(users.id, id), eq(users.tenantId, tenant.id)));
-  } else {
-    if (password.length < 8) return { error: "Set a password of at least 8 characters." };
-    await db.insert(users).values({
-      id: uid(),
-      tenantId: tenant.id,
-      name,
-      email,
-      role: role as "owner",
-      passwordHash: await bcrypt.hash(password, 10),
-    });
+  } catch (e) {
+    if (isAlreadyExists(e)) return emailTaken;
+    return fail(e);
   }
   revalidatePath("/app/staff");
   return { ok: true, message: id ? "Saved." : `${name} can now log in.` };
@@ -508,7 +498,9 @@ export async function saveStaff(_: ActionResult, f: FormData): Promise<ActionRes
 export async function setStaffActive(id: string, active: boolean): Promise<ActionResult> {
   const { user: me, tenant } = await requireUser(["owner"]);
   if (id === me.id) return { error: "You can't deactivate yourself." };
-  await db.update(users).set({ active }).where(and(eq(users.id, id), eq(users.tenantId, tenant.id)));
+  const ref = col.users().doc(id);
+  if ((await ref.get()).get("tenantId") !== tenant.id) return { error: "Staff not found." };
+  await ref.update({ active });
   revalidatePath("/app/staff");
   return { ok: true };
 }
@@ -520,7 +512,7 @@ export async function saveSettings(_: ActionResult, f: FormData): Promise<Action
   try {
     const name = str(f, "name");
     if (!name) return { error: "Enter the kedai name." };
-    const set: Partial<typeof tenants.$inferInsert> = {
+    const set: Partial<Tenant> = {
       name,
       address: str(f, "address").slice(0, 255) || null,
       phone: str(f, "phone").slice(0, 32) || null,
@@ -549,7 +541,7 @@ export async function saveSettings(_: ActionResult, f: FormData): Promise<Action
     }
     if (bool(f, "removeQr")) set.duitnowQrUrl = null;
 
-    await db.update(tenants).set(set).where(eq(tenants.id, tenant.id));
+    await col.tenants().doc(tenant.id).update(set);
     revalidatePath("/app", "layout");
     return { ok: true, message: "Settings saved." };
   } catch (e) {
@@ -569,8 +561,7 @@ export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResu
     if (s.openOrders > 0)
       return { error: `${s.openOrders} order(s) on ${date} are still unpaid or awaiting confirmation. Settle or cancel them first.` };
     const openingFloat = sen(f, "openingFloat", "opening float");
-    await db.insert(reconciliations).values({
-      id: uid(),
+    const rec: Omit<Reconciliation, "id"> = {
       tenantId: tenant.id,
       businessDate: date,
       openingFloat,
@@ -583,20 +574,21 @@ export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResu
       creditSales: s.byMethod.credit,
       notes: str(f, "notes").slice(0, 500) || null,
       closedBy: user.id,
-    });
+      createdAt: new Date(),
+    };
+    await col.of(tenant.id, "reconciliations").doc(date).create(rec);
     revalidatePath("/app/recon");
     return { ok: true, message: `${date} closed.` };
   } catch (e) {
-    if (e instanceof Error && /Duplicate entry/i.test(e.message)) return { error: "This date is already closed." };
+    if (isAlreadyExists(e)) return { error: "This date is already closed." };
     return fail(e);
   }
 }
 
 export async function reopenDay(date: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  await db
-    .delete(reconciliations)
-    .where(and(eq(reconciliations.tenantId, tenant.id), eq(reconciliations.businessDate, date)));
+  if (!isValidDate(date)) return { error: "Pick a valid date." };
+  await col.of(tenant.id, "reconciliations").doc(date).delete();
   revalidatePath("/app/recon");
   return { ok: true };
 }

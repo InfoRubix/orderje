@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { customers, type RegisteredCustomerType } from "@/db/schema";
+import type { RegisteredCustomerType } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { outstandingCredit } from "@/lib/orders";
+import { listCustomers } from "@/lib/repo";
 import { pct, rm } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Card, Empty, PageHeader } from "@/components/ui";
@@ -21,11 +20,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const { tenant } = await requireUser(["owner", "cashier"]);
   const sp = await searchParams;
   const type = (TABS.find((t) => t.key === sp.type)?.key ?? "member") as RegisteredCustomerType;
-  const list = await db
-    .select()
-    .from(customers)
-    .where(and(eq(customers.tenantId, tenant.id), eq(customers.type, type)))
-    .orderBy(asc(customers.name));
+  const list = await listCustomers(tenant.id, { type });
   const owing = type === "corporate" ? await Promise.all(list.map((c) => outstandingCredit(tenant.id, c.id))) : [];
 
   const blurb = {

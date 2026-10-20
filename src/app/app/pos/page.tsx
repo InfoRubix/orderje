@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
 import { Plus } from "lucide-react";
-import { db } from "@/db";
-import { orders, payments } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { getOrderRow } from "@/lib/orders";
+import { ordersCreatedBetween, ordersPaidBetween, pendingPayments } from "@/lib/repo";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { minutesAgo } from "@/lib/time";
@@ -20,34 +19,25 @@ export default async function PosPage() {
   const { tenant } = await requireUser(["owner", "cashier"]);
   const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-  const pending = await db
-    .select({ pay: payments, order: orders })
-    .from(payments)
-    .innerJoin(orders, eq(orders.id, payments.orderId))
-    .where(and(eq(payments.tenantId, tenant.id), eq(payments.status, "pending")))
-    .orderBy(asc(payments.createdAt));
-
-  const unpaid = await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.tenantId, tenant.id),
-        eq(orders.paymentStatus, "unpaid"),
-        ne(orders.status, "cancelled"),
-        gte(orders.createdAt, since),
-      ),
+  const [pays, recent, paid] = await Promise.all([
+    pendingPayments(tenant.id),
+    ordersCreatedBetween(tenant.id, since),
+    ordersPaidBetween(tenant.id, new Date(Date.now() - 2 * 60 * 60 * 1000)),
+  ]);
+  const pending = (
+    await Promise.all(
+      pays.map(async (pay) => {
+        const order = pay.orderId ? await getOrderRow(tenant.id, pay.orderId) : undefined;
+        return order ? { pay, order } : null;
+      }),
     )
-    .orderBy(desc(orders.createdAt));
+  ).filter((x) => x !== null);
+
+  const unpaid = recent.filter((o) => o.paymentStatus === "unpaid" && o.status !== "cancelled");
 
   const byTable = unpaid.filter((o) => o.tableLabel);
   const others = unpaid.filter((o) => !o.tableLabel);
-  const recentPaid = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.tenantId, tenant.id), inArray(orders.paymentStatus, ["paid", "credit"]), gte(orders.paidAt, new Date(Date.now() - 2 * 60 * 60 * 1000))))
-    .orderBy(desc(orders.paidAt))
-    .limit(8);
+  const recentPaid = paid.slice(0, 8);
 
   return (
     <div>

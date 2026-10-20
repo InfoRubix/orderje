@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { and, desc, eq, gte, lt } from "drizzle-orm";
-import { db } from "@/db";
-import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { ordersCreatedBetween } from "@/lib/repo";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { dayRange, fmtTime, isValidDate, myDate } from "@/lib/time";
@@ -18,11 +16,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const date = isValidDate(sp.date) ? sp.date : myDate();
   const { start, end } = dayRange(date);
-  const list = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.tenantId, tenant.id), gte(orders.createdAt, start), lt(orders.createdAt, end)))
-    .orderBy(desc(orders.createdAt));
+  const list = await ordersCreatedBetween(tenant.id, start, end);
 
   return (
     <div>

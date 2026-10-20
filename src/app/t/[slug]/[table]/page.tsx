@@ -1,30 +1,24 @@
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { diningTables, tenants } from "@/db/schema";
 import { loadMenu } from "@/lib/orders";
+import { getTableByToken, getTenantBySlug } from "@/lib/repo";
 import { CustomerMenu } from "./menu";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [t] = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.slug, slug)).limit(1);
+  const t = await getTenantBySlug(slug);
   return { title: t ? `Menu · ${t.name}` : "Menu" };
 }
 
 export default async function TablePage({ params }: { params: Promise<{ slug: string; table: string }> }) {
   const { slug, table } = await params;
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
+  const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
 
   let tableLabel: string | null = null;
   if (table !== "takeaway") {
-    const [t] = await db
-      .select()
-      .from(diningTables)
-      .where(and(eq(diningTables.token, table), eq(diningTables.tenantId, tenant.id)))
-      .limit(1);
+    const t = await getTableByToken(tenant.id, table);
     if (!t || !t.active) notFound();
     tableLabel = t.label;
   }

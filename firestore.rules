@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// OrderJe reads and writes Firestore only from the Next.js server (Admin SDK, which bypasses
+// these rules). Browsers and the Firebase client SDK get no direct access to any data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

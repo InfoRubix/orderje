@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
-import { db } from "@/db";
-import { categories } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { loadMenu } from "@/lib/orders";
+import { listCategories } from "@/lib/repo";
 import { Card, Empty } from "@/components/ui";
 import { ItemForm, ModifierEditor } from "./forms";
 
@@ -19,11 +17,7 @@ export default async function MenuItemPage({
   const { id } = await params;
   const { category } = await searchParams;
   const { tenant } = await requireUser(["owner"]);
-  const cats = await db
-    .select({ id: categories.id, name: categories.name })
-    .from(categories)
-    .where(eq(categories.tenantId, tenant.id))
-    .orderBy(asc(categories.sort));
+  const cats = (await listCategories(tenant.id)).map((c) => ({ id: c.id, name: c.name }));
 
   const item =
     id === "new"

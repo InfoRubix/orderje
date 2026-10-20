@@ -1,6 +1,6 @@
 import "server-only";
-import { db } from "@/db";
-import { categories, diningTables, menuItems, modifierGroups, modifierOptions } from "@/db/schema";
+import { col, fs } from "@/db";
+import type { MenuItem } from "@/db/schema";
 import { token, uid } from "./utils";
 
 type SeedItem = { name: string; price: number; desc?: string; groups?: { name: string; required: boolean; max: number; options: [string, number][] }[] };
@@ -55,51 +55,51 @@ const SAMPLE: { category: string; items: SeedItem[] }[] = [
 ];
 
 export async function seedSampleMenu(tenantId: string) {
-  let cSort = 0;
-  for (const cat of SAMPLE) {
+  const batch = fs().batch();
+  SAMPLE.forEach((cat, cSort) => {
     const categoryId = uid();
-    await db.insert(categories).values({ id: categoryId, tenantId, name: cat.category, sort: cSort++ });
-    let iSort = 0;
-    for (const it of cat.items) {
+    batch.create(col.of(tenantId, "categories").doc(categoryId), { tenantId, name: cat.category, sort: cSort });
+    cat.items.forEach((it, iSort) => {
       const menuItemId = uid();
-      await db.insert(menuItems).values({
-        id: menuItemId,
+      const item: Omit<MenuItem, "id"> = {
         tenantId,
         categoryId,
         name: it.name,
         description: it.desc ?? null,
         price: it.price,
-        sort: iSort++,
-      });
-      let gSort = 0;
-      for (const g of it.groups ?? []) {
-        const groupId = uid();
-        await db.insert(modifierGroups).values({
-          id: groupId,
-          tenantId,
-          menuItemId,
-          name: g.name,
-          required: g.required,
-          maxSelect: g.max,
-          sort: gSort++,
-        });
-        await db.insert(modifierOptions).values(
-          g.options.map(([name, price], i) => ({ id: uid(), tenantId, groupId, name, price, sort: i })),
-        );
-      }
-    }
-  }
+        imageUrl: null,
+        available: true,
+        sort: iSort,
+        groups: (it.groups ?? []).map((g, gSort) => {
+          const groupId = uid();
+          return {
+            id: groupId,
+            menuItemId,
+            name: g.name,
+            required: g.required,
+            maxSelect: g.max,
+            sort: gSort,
+            options: g.options.map(([name, price], i) => ({ id: uid(), groupId, name, price, sort: i })),
+          };
+        }),
+      };
+      batch.create(col.of(tenantId, "menuItems").doc(menuItemId), item);
+    });
+  });
+  await batch.commit();
 }
 
-export async function seedTables(tenantId: string, count: number) {
+export async function seedTables(tenantId: string, count: number, startAt = 1, prefix = "Meja") {
   if (count <= 0) return;
-  await db.insert(diningTables).values(
-    Array.from({ length: count }, (_, i) => ({
-      id: uid(),
+  const batch = fs().batch();
+  for (let i = 0; i < count; i++) {
+    batch.create(col.of(tenantId, "tables").doc(uid()), {
       tenantId,
-      label: `Meja ${i + 1}`,
+      label: `${prefix} ${startAt + i}`.slice(0, 40),
       token: token(12),
-      sort: i,
-    })),
-  );
+      active: true,
+      sort: startAt + i,
+    });
+  }
+  await batch.commit();
 }

@@ -43,3 +43,14 @@ next-env.d.ts
 # test output
 /test-results
 !.env.example
+
+# firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Firebase service-account keys (database credentials)
+*-firebase-adminsdk-*.json
+serviceAccount*.json
+key.json

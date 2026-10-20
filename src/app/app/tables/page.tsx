@@ -1,7 +1,5 @@
 import QRCode from "qrcode";
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { diningTables } from "@/db/schema";
+import { listTables } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
 import { appUrl } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
@@ -15,7 +13,7 @@ async function qrSvg(url: string) {
 
 export default async function TablesPage() {
   const { tenant } = await requireUser(["owner"]);
-  const tables = await db.select().from(diningTables).where(eq(diningTables.tenantId, tenant.id)).orderBy(asc(diningTables.sort));
+  const tables = await listTables(tenant.id);
   const base = `${appUrl()}/t/${tenant.slug}`;
   const cards = await Promise.all(
     tables.map(async (t) => ({ ...t, url: `${base}/${t.token}`, svg: await qrSvg(`${base}/${t.token}`) })),

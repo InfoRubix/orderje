@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { reconciliations, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { listUsers, recentReconciliations } from "@/lib/repo";
 import { reconSummary } from "@/lib/reports";
 import { rm } from "@/lib/money";
 import { fmtDateTime, fmtTime, isValidDate, myDate } from "@/lib/time";
@@ -19,13 +17,9 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
   const today = myDate();
   const date = isValidDate(sp.date) && sp.date <= today ? sp.date : today;
   const s = await reconSummary(tenant.id, date);
-  const history = await db
-    .select({ r: reconciliations, by: users.name })
-    .from(reconciliations)
-    .leftJoin(users, eq(users.id, reconciliations.closedBy))
-    .where(eq(reconciliations.tenantId, tenant.id))
-    .orderBy(desc(reconciliations.businessDate))
-    .limit(14);
+  const [recs, staff] = await Promise.all([recentReconciliations(tenant.id, 14), listUsers(tenant.id)]);
+  const names = new Map(staff.map((u) => [u.id, u.name]));
+  const history = recs.map((r) => ({ r, by: names.get(r.closedBy) ?? null }));
 
   const expected = {
     cash: s.byMethod.cash + s.settlements.cash,

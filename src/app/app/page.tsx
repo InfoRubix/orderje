@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { and, count, eq, gte, inArray, ne } from "drizzle-orm";
-import { db } from "@/db";
-import { orders } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { ordersCreatedBetween } from "@/lib/repo";
 import { salesReport } from "@/lib/reports";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
@@ -44,17 +42,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   } else range = range === "custom" ? "today" : range;
 
   const r = await salesReport(tenant.id, from, to);
-  const [open] = await db
-    .select({ n: count() })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.tenantId, tenant.id),
-        inArray(orders.paymentStatus, ["unpaid", "pending"]),
-        ne(orders.status, "cancelled"),
-        gte(orders.createdAt, new Date(Date.now() - 3 * 86400000)),
-      ),
-    );
+  const open = {
+    n: (await ordersCreatedBetween(tenant.id, new Date(Date.now() - 3 * 86400000))).filter(
+      (o) => o.status !== "cancelled" && (o.paymentStatus === "unpaid" || o.paymentStatus === "pending"),
+    ).length,
+  };
 
   const multiDay = from !== to;
   const days: string[] = [];

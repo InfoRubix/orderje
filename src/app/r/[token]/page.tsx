@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { tenants } from "@/db/schema";
 import { getOrderByToken } from "@/lib/orders";
+import { getTenant } from "@/lib/repo";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { fmtDateTime } from "@/lib/time";
@@ -23,7 +21,8 @@ export default async function ReceiptPage({
   const { print } = await searchParams;
   const order = await getOrderByToken(token);
   if (!order) notFound();
-  const [t] = await db.select().from(tenants).where(eq(tenants.id, order.tenantId));
+  const t = await getTenant(order.tenantId);
+  if (!t) notFound();
   const paid = order.payments.filter((p) => p.status === "success");
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
 

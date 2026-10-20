@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
-import { db } from "@/db";
-import { customers, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getOrder, outstandingCredit } from "@/lib/orders";
+import { listCustomers, listUsers } from "@/lib/repo";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { fmtDateTime } from "@/lib/time";
@@ -20,14 +18,17 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   const order = await getOrder(tenant.id, id);
   if (!order) notFound();
 
-  const custList = await db
-    .select({ id: customers.id, type: customers.type, name: customers.name, phone: customers.phone, company: customers.company, creditLimit: customers.creditLimit })
-    .from(customers)
-    .where(and(eq(customers.tenantId, tenant.id), eq(customers.active, true)))
-    .orderBy(asc(customers.name));
+  const custList = (await listCustomers(tenant.id, { activeOnly: true })).map((c) => ({
+    id: c.id,
+    type: c.type,
+    name: c.name,
+    phone: c.phone,
+    company: c.company,
+    creditLimit: c.creditLimit,
+  }));
   const owing = order.customerType === "corporate" && order.customerId ? await outstandingCredit(tenant.id, order.customerId) : 0;
   const staffNames = new Map(
-    (await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.tenantId, tenant.id))).map((u) => [u.id, u.name]),
+    (await listUsers(tenant.id)).map((u) => [u.id, u.name]),
   );
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
 

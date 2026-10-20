@@ -1,9 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { tenants, users, type Role } from "@/db/schema";
+import type { Role } from "@/db/schema";
+import { getTenant, getUser } from "./repo";
 import { SESSION_COOKIE, verifySession } from "./session";
 
 export async function getSession() {
@@ -15,16 +14,12 @@ export async function getSession() {
 export async function requireUser(roles?: Role[]) {
   const s = await getSession();
   if (!s) redirect("/login");
-  const [row] = await db
-    .select({ user: users, tenant: tenants })
-    .from(users)
-    .innerJoin(tenants, eq(tenants.id, users.tenantId))
-    .where(eq(users.id, s.uid))
-    .limit(1);
-  if (!row || !row.user.active) redirect("/login?e=inactive");
-  if (!row.tenant.active) redirect("/login?e=suspended");
-  if (roles && !roles.includes(row.user.role)) redirect(homeFor(row.user.role));
-  return row;
+  const user = await getUser(s.uid);
+  if (!user || !user.active) redirect("/login?e=inactive");
+  const tenant = await getTenant(user.tenantId);
+  if (!tenant || !tenant.active) redirect("/login?e=suspended");
+  if (roles && !roles.includes(user.role)) redirect(homeFor(user.role));
+  return { user, tenant };
 }
 
 export function homeFor(role: Role) {
