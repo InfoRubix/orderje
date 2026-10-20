@@ -1,103 +1,88 @@
-import Image from "next/image";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession, homeFor } from "@/lib/auth";
+import { buttonVariants } from "@/components/ui";
 
-export default function Home() {
+export default async function Home() {
+  const s = await getSession();
+  if (s) redirect(homeFor(s.role));
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="min-h-dvh">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <span className="font-display text-2xl font-bold">OrderJe</span>
+        <Link href="/login" className={buttonVariants({ variant: "secondary" })}>
+          Log in
+        </Link>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-8 md:grid-cols-[1.1fr_1fr]">
+        <div>
+          <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
+            Customers order from the table. You just cook and collect.
+          </h1>
+          <p className="mt-5 max-w-lg text-lg text-ink-soft">
+            QR ordering, kitchen screen, counter POS and end-of-day recon for kedai makan. Cash, DuitNow QR and FPX all land
+            in one place, and member, staff and corporate pricing is one tap at the counter.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {process.env.ALLOW_SIGNUP !== "false" ? (
+              <Link href="/signup" className={buttonVariants({ size: "xl" })}>
+                Set up your kedai
+              </Link>
+            ) : null}
+            <a href="https://wa.me/" className={buttonVariants({ size: "xl", variant: "secondary" })}>
+              Talk to Rubix
+            </a>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        <div className="relative mx-auto w-full max-w-sm" aria-hidden>
+          <div className="slip rotate-[-2deg] rounded-t-lg px-6 pb-8 pt-5 font-mono text-sm">
+            <div className="flex items-baseline justify-between border-b border-dashed border-line pb-3">
+              <span className="font-display text-3xl font-bold">#047</span>
+              <span className="font-sans font-semibold">Meja 6</span>
+            </div>
+            <ul className="space-y-2 py-4">
+              <li className="flex justify-between">
+                <span>2 × Roti Telur</span>
+                <span>5.00</span>
+              </li>
+              <li className="flex justify-between">
+                <span>1 × Mee Goreng Mamak</span>
+                <span>7.00</span>
+              </li>
+              <li className="pl-5 text-ink-soft">Extra pedas</li>
+              <li className="flex justify-between">
+                <span>3 × Teh Tarik</span>
+                <span>9.00</span>
+              </li>
+              <li className="pl-5 text-ink-soft">Ais, kurang manis</li>
+            </ul>
+            <div className="flex justify-between border-t border-dashed border-line pt-3 font-bold">
+              <span>TOTAL</span>
+              <span>RM 21.00</span>
+            </div>
+            <p className="mt-3 text-center font-sans text-xs font-semibold text-pandan">PAID · DuitNow QR</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-line bg-surface">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 md:grid-cols-3">
+          {[
+            ["Order from the table", "Every table gets its own QR. Customers pick add-ons like ais or kurang manis, and the order lands in the kitchen tagged with the table."],
+            ["Pay any way", "Cash with 5-sen rounding, DuitNow QR confirmed at the counter, FPX through your own ToyyibPay, or company credit settled monthly."],
+            ["Close the day in minutes", "Count the drawer, check the bank app, and see exactly where cash, QR and online are short or over."],
+          ].map(([t, d]) => (
+            <div key={t}>
+              <h2 className="font-display text-xl font-bold">{t}</h2>
+              <p className="mt-2 text-ink-soft">{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+      <footer className="mx-auto max-w-6xl px-6 py-8 text-sm text-mute">OrderJe by Rubix Technology (M) Sdn Bhd</footer>
+    </main>
   );
 }
