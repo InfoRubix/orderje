@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Button, Field, FormError, Input, Select } from "@/components/ui";
 import { saveStaff, setStaffActive } from "../actions";
@@ -16,7 +17,7 @@ export function StaffForm({ u, onDone }: { u?: U; onDone?: () => void }) {
     }
   }, [state, u, onDone]);
   return (
-    <form ref={ref} action={action} className="grid gap-3 sm:grid-cols-2">
+    <form ref={ref} onSubmit={keep(action)} className="grid gap-3 sm:grid-cols-2">
       {u ? <input type="hidden" name="id" value={u.id} /> : null}
       <Field label="Name">
         <Input name="name" defaultValue={u?.name} required />

@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Button, Field, FormError, Input, Select } from "@/components/ui";
 import { saveCustomer, settleCredit } from "../actions";
@@ -24,7 +25,7 @@ export function CustomerForm({ type, c, onDone }: { type: C["type"]; c?: C; onDo
     }
   }, [state, c, onDone]);
   return (
-    <form ref={ref} action={action} className="grid gap-3 sm:grid-cols-2">
+    <form ref={ref} onSubmit={keep(action)} className="grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="type" value={type} />
       {c ? <input type="hidden" name="id" value={c.id} /> : null}
       <Field label={type === "corporate" ? "Contact person" : "Name"}>
@@ -104,7 +105,7 @@ function SettleForm({ customerId, owing, onDone }: { customerId: string; owing: 
     if (state?.ok) onDone();
   }, [state, onDone]);
   return (
-    <form action={action} className="mt-3 grid gap-3 rounded-lg bg-paper p-4 sm:grid-cols-4">
+    <form onSubmit={keep(action)} className="mt-3 grid gap-3 rounded-lg bg-paper p-4 sm:grid-cols-4">
       <input type="hidden" name="customerId" value={customerId} />
       <Field label="Amount (RM)">
         <Input name="amount" defaultValue={(owing / 100).toFixed(2)} inputMode="decimal" className="num" />

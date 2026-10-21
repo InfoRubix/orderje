@@ -20,8 +20,16 @@ export async function shrinkImage(file: File, maxSide: number): Promise<File> {
   }
   g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  const type = png ? "image/png" : "image/jpeg";
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, type, 0.82));
+  const encode = (type: string) => new Promise<Blob | null>((res) => canvas.toBlob(res, type, 0.82));
+  let blob = await encode(png ? "image/png" : "image/jpeg");
+  // A photo-like PNG can stay big even when small in pixels; JPEG keeps it under the upload limit.
+  if (blob && blob.type === "image/png" && blob.size > 700_000) {
+    g.globalCompositeOperation = "destination-over";
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    blob = await encode("image/jpeg");
+  }
   if (!blob) throw new Error("Couldn't prepare that image. Try another file.");
-  return new File([blob], `photo.${png ? "png" : "jpg"}`, { type });
+  const jpeg = blob.type === "image/jpeg";
+  return new File([blob], `photo.${jpeg ? "jpg" : "png"}`, { type: jpeg ? "image/jpeg" : "image/png" });
 }

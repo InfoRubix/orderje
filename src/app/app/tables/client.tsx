@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useState, useTransition } from "react";
 import { Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ export function PrintButton() {
 export function AddTables() {
   const [state, action, pending] = useActionState(addTables, undefined);
   return (
-    <form action={action} className="mb-6 flex flex-wrap items-center gap-2">
+    <form onSubmit={keep(action)} className="mb-6 flex flex-wrap items-center gap-2">
       <span className="text-sm font-medium">Add</span>
       <Input name="count" type="number" min={1} max={100} defaultValue={1} className="w-20" aria-label="How many" />
       <Input name="prefix" defaultValue="Meja" className="w-32" aria-label="Name prefix" />

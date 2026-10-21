@@ -7,6 +7,7 @@ import { shrinkImage } from "@/lib/shrink-image";
 import { cn } from "@/lib/utils";
 import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { ItemThumb, ShopLogo } from "@/components/thumb";
+import { keep } from "@/lib/keep-form";
 import { saveBrand } from "../actions";
 
 type Brand = {
@@ -52,11 +53,11 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <form
-        action={(f) => {
+        onSubmit={keep((f) => {
           if (logo) f.set("logo", logo);
           if (removeLogo) f.set("removeLogo", "on");
-          return action(f);
-        }}
+          action(f);
+        })}
         className="space-y-5"
       >
         <Card className="space-y-4 p-5">

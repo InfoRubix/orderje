@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { rm } from "@/lib/money";
@@ -113,7 +114,7 @@ function NewCategory() {
   }, [state]);
   return (
     <Card className="p-5">
-      <form ref={ref} action={action} className="space-y-3">
+      <form ref={ref} onSubmit={keep(action)} className="space-y-3">
         <h2 className="font-display text-lg font-bold">New category</h2>
         <Input name="name" placeholder="e.g. Minuman Sejuk" maxLength={40} aria-label="Category name" required />
         <Button variant="secondary" className="w-full" disabled={pending}>

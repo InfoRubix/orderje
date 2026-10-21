@@ -98,6 +98,7 @@ pip install playwright && playwright install chromium
 npm run emulators                       # terminal 1
 npm run build && npm start              # terminal 2
 python3 tests/e2e.py                    # WIPES the emulator first; refuses to touch a real project
+python3 tests/features.py               # every feature's rules and error cases, prints PASS/FAIL per feature
 ```
 
 ## Data changes

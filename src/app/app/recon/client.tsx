@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useState, useTransition } from "react";
 import { rm, toSen } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ export function CloseDayForm({ date, expected }: { date: string; expected: { cas
     <Card className="p-5">
       <h2 className="font-display text-lg font-bold">Close {date}</h2>
       <p className="mb-4 text-sm text-ink-soft">Count the drawer and check your bank app, then enter what you see.</p>
-      <form action={action} className="space-y-4">
+      <form onSubmit={keep(action)} className="space-y-4">
         <input type="hidden" name="date" value={date} />
         <Field label="Opening float (RM)" hint="Cash in the drawer before the first sale">
           <Input name="openingFloat" value={float} onChange={(e) => setFloat(e.target.value)} inputMode="decimal" className="num" />

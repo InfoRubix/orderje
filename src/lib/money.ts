@@ -7,7 +7,9 @@ export function rm(sen: number) {
 /** Parse "12.50" / "12" / "RM12.5" into sen. Returns NaN on bad input. */
 export function toSen(input: string | number | null | undefined) {
   if (input === null || input === undefined || input === "") return NaN;
-  const n = typeof input === "number" ? input : Number(String(input).replace(/[^0-9.\-]/g, ""));
+  const cleaned = typeof input === "number" ? "" : String(input).replace(/[^0-9.\-]/g, "");
+  if (typeof input !== "number" && !cleaned) return NaN; // "abc" is not zero
+  const n = typeof input === "number" ? input : Number(cleaned);
   return Number.isFinite(n) ? Math.round(n * 100) : NaN;
 }
 

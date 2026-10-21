@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState, useState } from "react";
 import { signup } from "../actions";
 import { Button, Field, FormError, Input } from "@/components/ui";
@@ -18,7 +19,7 @@ export function SignupForm() {
   const [slugEdited, setSlugEdited] = useState(false);
 
   return (
-    <form action={action} className="mt-6 space-y-4">
+    <form onSubmit={keep(action)} className="mt-6 space-y-4">
       <FormError message={state?.error} />
       <Field label="Kedai name">
         <Input

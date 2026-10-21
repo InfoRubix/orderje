@@ -1,5 +1,6 @@
 "use client";
 
+import { keep } from "@/lib/keep-form";
 import { useActionState } from "react";
 import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { saveSettings } from "../actions";
@@ -25,7 +26,7 @@ function Section({ title, sub, children }: { title: string; sub?: string; childr
 export function SettingsForm({ t }: { t: T }) {
   const [state, action, pending] = useActionState(saveSettings, undefined);
   return (
-    <form action={action} className="space-y-5">
+    <form onSubmit={keep(action)} className="space-y-5">
       <Section title="Contact" sub="Where Rubix reaches you about your account.">
         <Field label="Email" className="sm:col-span-2">
           <Input name="email" type="email" defaultValue={t.email} />
