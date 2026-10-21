@@ -5,27 +5,29 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 ## What it does
 
 **Customer (phone, no app)**
-- Scans the QR on their table (or the takeaway QR), browses the menu, picks add-ons (ais, kurang manis, telur mata), and sends the order.
-- Watches the order move through Received → Cooking → Ready → Served on a live page.
-- Pays online by FPX (ToyyibPay), by DuitNow QR (cashier confirms), or at the counter.
+- Scans the QR on their table (or the takeaway QR) and sees the kedai's own menu: logo, short description, brand colour and a photo for each item.
+- Picks add-ons (ais, kurang manis, telur mata), chooses makan sini or bungkus, and sends the order.
+- Watches the order move through Received → Cooking → Ready → Served on a live page, which tells them to **pay at the counter**.
 - Gets a receipt link they can save or share by WhatsApp.
 
 **Kitchen**
-- Live ticket board (New / Cooking / Ready), polling every 4 s, with optional sound for new orders and full-screen mode for a wall tablet.
+- Live ticket board (New / Cooking / Ready) with Undo and Cancel, polling every 4 s, with optional sound for new orders and full-screen mode for a wall tablet.
 
 **Counter (cashier)**
-- Unpaid bills by table, customer QR payments waiting for confirmation, and a quick order builder for walk-ins, takeaway and delivery (Grab/Foodpanda).
+- Unpaid bills by table, a "just paid" list with the payment method and receipt, and a quick order builder for walk-ins, takeaway and delivery (Grab/Foodpanda).
 - Customer type at payment: **Walk-in, Member, Staff, Corporate**. Member and staff discounts apply automatically; corporate bills go on the company's credit account with a limit, settled later.
-- Payment methods: **Cash** (BNM 5-sen rounding, quick tender buttons, change shown), **DuitNow QR** (bank reference required), **Corporate credit**, plus **online FPX** from the customer's phone.
+- Payment methods: **Cash** (BNM 5-sen rounding, quick tender buttons, change shown), **DuitNow QR** (customer scans the kedai's QR at the counter; bank reference required) and **Corporate credit**.
 - Printable 80 mm thermal receipt.
 
 **Owner**
 - Dashboard: sales, average bill, money in hand vs credit, discounts, cancellations, sales by hour/day, by payment method, customer type, order type, QR vs counter, best sellers, SST and service charge collected.
-- **End-of-day recon**: system totals for cash, DuitNow QR and online vs what's in the drawer, bank app and ToyyibPay, with short/over per channel, a tick-off list of every QR/FPX payment with its reference, and a closing history. A day can't close with unpaid bills, and payments are blocked once it's closed (owner can reopen).
-- Menu with categories, add-on groups (required / optional, max picks, extra price), sold-out toggle.
-- Tables with printable QR codes; regenerate a QR if a sticker is copied.
+- **End-of-day recon**: system totals for cash and DuitNow QR vs what's in the drawer and the bank app, with short/over per channel, a tick-off list of every QR payment with its reference, and a closing history. A day can't close with unpaid bills (it lists them), and payments are blocked once it's closed (owner can reopen).
+- **Brand & profile**: logo, kedai name, short description, address, phone, receipt message and brand colour (8 presets or any colour), with a live phone preview.
+- **Menu**: categories you can reorder, rename and delete; each item edited in one popup with photo upload, price, description, sold-out and add-on groups (required / optional, max picks, extra price). Photos are shrunk in the browser before upload.
+- Tables with printable, brand-coloured QR cards; regenerate a QR if a sticker is copied.
 - Staff logins with roles: owner, cashier, kitchen.
-- Settings: SST, service charge (dine-in only), member/staff discount, DuitNow QR image, ToyyibPay keys.
+- Settings: SST, service charge (dine-in only), member/staff discount.
+- Light and dark mode follow the device.
 
 **Rubix (super admin)** at `/admin`: every kedai, 30-day order count, suspend / reactivate.
 
@@ -35,9 +37,9 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 
 ## Stack
 
-Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Cloud Firestore (Firebase Admin SDK) · Vercel · JWT session cookies (jose) · bcrypt.
+Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Cloud Firestore + Cloud Storage for Firebase (Admin SDK) · Vercel · JWT session cookies (jose) · bcrypt.
 
-All data access happens on the server through the Admin SDK; `firestore.rules` denies every direct client read and write. Money is stored as integer sen; rates as basis points. Timestamps are Firestore timestamps (UTC); business dates are Malaysia time. The data model is documented at the top of `src/db/schema.ts`. Every query filters on a single field, so no composite indexes are needed.
+All data access happens on the server through the Admin SDK; `firestore.rules` and `storage.rules` deny every direct client read and write. Logos and menu photos are stored in Cloud Storage and shown through Firebase download-token URLs. Money is stored as integer sen; rates as basis points. Timestamps are Firestore timestamps (UTC); business dates are Malaysia time. The data model is documented at the top of `src/db/schema.ts`. Every query filters on a single field, so no composite indexes are needed.
 
 ## Run locally
 
@@ -46,7 +48,7 @@ Needs Node 20+, Java 11+ (for the Firestore emulator) and the Firebase CLI (`npm
 ```bash
 cp .env.example .env.local        # points at the emulator; set AUTH_SECRET
 npm install
-npm run emulators                 # terminal 1: Firestore emulator on :8080 (data is lost when it stops)
+npm run emulators                 # terminal 1: Firestore :8080 + Storage :9199 (data is lost when they stop)
 npm run dev                       # terminal 2: http://localhost:3000
 ```
 
@@ -57,19 +59,22 @@ Sign up at `/signup` (tick "Start with a sample mamak menu" for demo data). The 
 | Variable | Purpose |
 |---|---|
 | `AUTH_SECRET` | 32+ random characters (`openssl rand -base64 48`) |
-| `APP_URL` | Public URL. Used in table QR codes and ToyyibPay return/callback URLs, so set it before printing QRs |
+| `APP_URL` | Public URL used in table QR codes, so set it before printing QRs |
 | `SUPERADMIN_EMAILS` | Comma-separated Rubix emails allowed into `/admin` |
 | `ALLOW_SIGNUP` | `false` to close public signup and onboard kedai manually |
 | `FIRESTORE_EMULATOR_HOST` | Local only: `127.0.0.1:8080` to use the emulator |
+| `FIREBASE_STORAGE_EMULATOR_HOST` | Local only: `127.0.0.1:9199` |
+| `FIREBASE_STORAGE_BUCKET` | Only if the bucket isn't the default `<project-id>.firebasestorage.app` |
 | `FIREBASE_PROJECT_ID` | Firebase project ID (`demo-orderje` for the emulator) |
 | `FIREBASE_SERVICE_ACCOUNT` | Service-account JSON (raw or base64) for the real project. Required on Vercel |
 
 ## Deploy: Vercel + Firestore
 
 **Firestore (Firebase console)**
-1. Create a **Cloud Firestore** database in the project: location `asia-southeast1` (Singapore), production mode. The free Spark plan is enough to start.
-2. **Rules** tab: paste `firestore.rules` and publish (or `npm run deploy:rules` after `firebase use --add`). It blocks all browser access; the app only talks to Firestore from the server.
-3. Project settings → **Service accounts** → *Generate new private key*. This JSON file is the app's database password: never commit it.
+1. Create a **Cloud Firestore** database in the project: location `asia-southeast1` (Singapore), production mode.
+2. Upgrade the project to the **Blaze** plan (needed for Cloud Storage on new projects; small kedai stay inside the free quota), then **Storage → Get started**, location `asia-southeast1`.
+3. Publish the rules: paste `firestore.rules` into Firestore → Rules and `storage.rules` into Storage → Rules (or run `npm run deploy:rules`). They block all browser access; the app only talks to Firebase from the server.
+4. Project settings → **Service accounts** → *Generate new private key*. This JSON file is the app's database password: never commit it.
 
 **Vercel**
 1. Import the GitHub repo as a Next.js project. `vercel.json` pins the functions to `sin1` (Singapore), next to the database; without it every query would cross the Pacific.
@@ -86,10 +91,6 @@ Sign up at `/signup` (tick "Start with a sample mamak menu" for demo data). The 
 
    Do **not** set `FIRESTORE_EMULATOR_HOST` on Vercel.
 3. Deploy. Set `APP_URL` to the final domain before printing the table QR codes from **Tables & QR** (changing it later means reprinting).
-
-### ToyyibPay
-
-Each kedai enters its own User Secret Key and Category Code in Settings, so FPX money settles directly to the kedai's ToyyibPay account. Sandbox mode is on by default. The callback URL (`/api/pay/toyyibpay/callback`) is sent with each bill automatically, and every callback is re-verified against ToyyibPay's `getBillTransactions` API before an order is marked paid.
 
 ## Tests
 
@@ -108,8 +109,7 @@ Firestore is schemaless: edit the types in `src/db/schema.ts` and the code that 
 
 ## Not built yet
 
-- Billplz / iPay88 as alternative gateways (ToyyibPay only for now).
+- Online payment from the customer's phone (FPX through ToyyibPay / Billplz). Removed for now: customers pay at the counter.
 - e-Invoice (LHDN MyInvois) submission.
 - Splitting one bill across several payment methods.
-- Menu photo upload (items take an https image link for now).
 - Direct ESC/POS printing (receipts print through the browser's print dialog).

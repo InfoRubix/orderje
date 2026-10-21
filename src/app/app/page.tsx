@@ -44,7 +44,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const r = await salesReport(tenant.id, from, to);
   const open = {
     n: (await ordersCreatedBetween(tenant.id, new Date(Date.now() - 3 * 86400000))).filter(
-      (o) => o.status !== "cancelled" && (o.paymentStatus === "unpaid" || o.paymentStatus === "pending"),
+      (o) => o.status !== "cancelled" && o.paymentStatus === "unpaid",
     ).length,
   };
 
@@ -55,7 +55,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const hours = r.byHour.slice(6).concat(r.byHour.slice(0, 6));
   const hourLabel = (h: number) => (h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`);
   const avg = r.orders ? Math.round(r.sales / r.orders) : 0;
-  const collected = (r.byMethod.cash?.total ?? 0) + (r.byMethod.duitnow_qr?.total ?? 0) + (r.byMethod.online?.total ?? 0);
+  const collected = (r.byMethod.cash?.total ?? 0) + (r.byMethod.duitnow_qr?.total ?? 0);
 
   return (
     <div className="max-w-6xl">
@@ -70,7 +70,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 href={`/app?range=${p.key}`}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-semibold",
-                  range === p.key ? "bg-ink text-white" : "text-ink-soft hover:text-ink",
+                  range === p.key ? "bg-ink text-on-ink" : "text-ink-soft hover:text-ink",
                 )}
               >
                 {p.label}
@@ -107,7 +107,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </p>
         </div>
         <Stat label="Average bill" value={rm(avg)} />
-        <Stat label="Money in hand" value={rm(collected)} sub={r.byMethod.credit ? `+ ${rm(r.byMethod.credit.total)} on credit` : "Cash, QR and online"} />
+        <Stat label="Money in hand" value={rm(collected)} sub={r.byMethod.credit ? `+ ${rm(r.byMethod.credit.total)} on credit` : "Cash and DuitNow QR"} />
         <Stat
           label="Discounts given"
           value={rm(r.discount)}
@@ -138,7 +138,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <h2 className="mb-4 font-display text-lg font-bold">Payment method</h2>
           <Breakdown
             total={r.sales}
-            rows={(["cash", "duitnow_qr", "online", "credit"] as const).map((m) => ({
+            rows={(["cash", "duitnow_qr", "credit"] as const).map((m) => ({
               label: METHOD_LABEL[m],
               value: r.byMethod[m]?.total ?? 0,
               n: r.byMethod[m]?.n ?? 0,

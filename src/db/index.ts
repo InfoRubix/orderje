@@ -1,4 +1,4 @@
-import { applicationDefault, cert, getApps, initializeApp, type AppOptions } from "firebase-admin/app";
+import { applicationDefault, cert, getApps, initializeApp, type App, type AppOptions } from "firebase-admin/app";
 import {
   getFirestore,
   Timestamp,
@@ -17,22 +17,33 @@ import {
  *  - Otherwise Application Default Credentials (gcloud auth application-default login, or Google Cloud hosting).
  */
 function appOptions(): AppOptions {
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-  if (process.env.FIRESTORE_EMULATOR_HOST) return { projectId: projectId || "demo-orderje" };
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
-  if (sa) {
-    const json = JSON.parse(sa.startsWith("{") ? sa : Buffer.from(sa, "base64").toString("utf8"));
-    return { credential: cert(json), projectId: projectId || json.project_id };
+  let projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+  let opts: AppOptions;
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    projectId ||= "demo-orderje";
+    opts = { projectId };
+  } else {
+    const sa = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+    if (sa) {
+      const json = JSON.parse(sa.startsWith("{") ? sa : Buffer.from(sa, "base64").toString("utf8"));
+      projectId ||= json.project_id;
+      opts = { credential: cert(json), projectId };
+    } else opts = { credential: applicationDefault(), projectId };
   }
-  return { credential: applicationDefault(), projectId };
+  // Default bucket of projects created since late 2024; older projects use <id>.appspot.com.
+  opts.storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
+  return opts;
+}
+
+export function firebaseApp(): App {
+  return getApps()[0] ?? initializeApp(appOptions());
 }
 
 const globalForDb = globalThis as unknown as { firestore?: Firestore };
 
 export function fs(): Firestore {
   if (globalForDb.firestore) return globalForDb.firestore;
-  const app = getApps()[0] ?? initializeApp(appOptions());
-  const store = getFirestore(app);
+  const store = getFirestore(firebaseApp());
   // REST instead of gRPC: much faster cold starts on serverless (Vercel functions).
   // The emulator only works over gRPC without credentials, so keep gRPC there.
   store.settings({ ignoreUndefinedProperties: true, preferRest: !process.env.FIRESTORE_EMULATOR_HOST });
@@ -48,7 +59,6 @@ export const col = {
   slugs: () => fs().collection("slugs"),
   emails: () => fs().collection("emails"),
   orderTokens: () => fs().collection("orderTokens"),
-  bills: () => fs().collection("bills"),
   /** A collection that belongs to one kedai, e.g. tenants/{id}/orders. */
   of: (tenantId: string, name: TenantSub) => fs().collection("tenants").doc(tenantId).collection(name),
 };

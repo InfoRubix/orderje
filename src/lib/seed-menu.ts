@@ -68,6 +68,7 @@ export async function seedSampleMenu(tenantId: string) {
         description: it.desc ?? null,
         price: it.price,
         imageUrl: null,
+        imagePath: null,
         available: true,
         sort: iSort,
         groups: (it.groups ?? []).map((g, gSort) => {

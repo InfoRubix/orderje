@@ -5,20 +5,11 @@ import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { saveSettings } from "../actions";
 
 type T = {
-  name: string;
-  address: string;
-  phone: string;
   email: string;
-  receiptFooter: string;
   sstRate: string;
   serviceChargeRate: string;
   memberDiscountRate: string;
   staffDiscountRate: string;
-  allowQrCounterPay: boolean;
-  duitnowQrUrl: string | null;
-  toyyibpayCategory: string;
-  hasToyyibpaySecret: boolean;
-  toyyibpaySandbox: boolean;
 };
 
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
@@ -31,25 +22,13 @@ function Section({ title, sub, children }: { title: string; sub?: string; childr
   );
 }
 
-export function SettingsForm({ t, callbackUrl }: { t: T; callbackUrl: string }) {
+export function SettingsForm({ t }: { t: T }) {
   const [state, action, pending] = useActionState(saveSettings, undefined);
   return (
     <form action={action} className="space-y-5">
-      <Section title="Kedai details" sub="Printed on receipts.">
-        <Field label="Kedai name" className="sm:col-span-2">
-          <Input name="name" defaultValue={t.name} required />
-        </Field>
-        <Field label="Address" className="sm:col-span-2">
-          <Input name="address" defaultValue={t.address} />
-        </Field>
-        <Field label="Phone">
-          <Input name="phone" defaultValue={t.phone} inputMode="tel" />
-        </Field>
-        <Field label="Email">
+      <Section title="Contact" sub="Where Rubix reaches you about your account.">
+        <Field label="Email" className="sm:col-span-2">
           <Input name="email" type="email" defaultValue={t.email} />
-        </Field>
-        <Field label="Receipt footer" className="sm:col-span-2">
-          <Input name="receiptFooter" defaultValue={t.receiptFooter} placeholder="Terima kasih, datang lagi!" />
         </Field>
       </Section>
 
@@ -66,53 +45,6 @@ export function SettingsForm({ t, callbackUrl }: { t: T; callbackUrl: string }) 
         <Field label="Staff discount (%)">
           <Input name="staffDiscountRate" defaultValue={t.staffDiscountRate} inputMode="decimal" className="num" />
         </Field>
-      </Section>
-
-      <Section title="DuitNow QR" sub="Your static DuitNow QR. Customers can scan it from their order page, and the counter confirms against your bank app.">
-        <div className="sm:col-span-2 flex flex-wrap items-start gap-4">
-          {t.duitnowQrUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.duitnowQrUrl} alt="Current DuitNow QR" className="w-32 rounded-lg border border-line" />
-          ) : (
-            <p className="rounded-lg bg-paper p-3 text-sm text-ink-soft">No QR uploaded yet.</p>
-          )}
-          <div className="space-y-2">
-            <Field label="Upload QR image" hint="PNG or JPG, under 400 KB">
-              <Input name="duitnowQr" type="file" accept="image/png,image/jpeg,image/webp" className="h-auto py-2" />
-            </Field>
-            {t.duitnowQrUrl ? (
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="removeQr" className="size-4 accent-chili" /> Remove current QR
-              </label>
-            ) : null}
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="allowQrCounterPay" defaultChecked={t.allowQrCounterPay} className="size-4 accent-pandan" />
-              Show the QR on customers&apos; order page
-            </label>
-          </div>
-        </div>
-      </Section>
-
-      <Section
-        title="Online payment (ToyyibPay FPX)"
-        sub="Money settles straight into your own ToyyibPay account. Leave blank to accept counter payments only."
-      >
-        <Field label="User secret key" hint={t.hasToyyibpaySecret ? "Saved. Leave blank to keep it." : "From ToyyibPay → Settings"}>
-          <Input name="toyyibpaySecret" type="password" autoComplete="off" placeholder={t.hasToyyibpaySecret ? "••••••••" : ""} />
-        </Field>
-        <Field label="Category code">
-          <Input name="toyyibpayCategory" defaultValue={t.toyyibpayCategory} />
-        </Field>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="toyyibpaySandbox" defaultChecked={t.toyyibpaySandbox} className="size-4 accent-pandan" />
-          Sandbox mode (testing, no real money)
-        </label>
-        {t.hasToyyibpaySecret ? (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="clearToyyibpay" className="size-4 accent-chili" /> Disconnect ToyyibPay
-          </label>
-        ) : null}
-        <p className="text-xs text-mute sm:col-span-2">Callback URL (set automatically): {callbackUrl}</p>
       </Section>
 
       <div className="sticky bottom-20 flex items-center gap-3 rounded-xl border border-line bg-surface p-3 md:bottom-4">

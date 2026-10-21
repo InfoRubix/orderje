@@ -7,7 +7,9 @@ import type { Menu, MenuItemFull } from "@/lib/orders";
 import { computeTotals } from "@/lib/pricing";
 import { rm } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { brandStyle } from "@/lib/brand";
 import { Button, FormError, Input, Textarea } from "@/components/ui";
+import { ItemThumb, ShopLogo } from "@/components/thumb";
 import { placeQrOrder } from "../../actions";
 
 type Rates = Parameters<typeof computeTotals>[0];
@@ -34,7 +36,7 @@ export function CustomerMenu({
   slug: string;
   table: string;
   tableLabel: string | null;
-  shop: { name: string; address: string | null };
+  shop: { name: string; tagline: string | null; address: string | null; logoUrl: string | null; brandColor: string };
   menu: Menu;
   rates: Rates;
 }) {
@@ -89,11 +91,15 @@ export function CustomerMenu({
   }, [menu]);
 
   return (
-    <div className="mx-auto min-h-dvh max-w-xl bg-paper pb-28">
-      <header className="bg-pandan px-5 pb-5 pt-6 text-white">
-        <p className="text-sm text-white/75">{tableLabel ? `You're at ${tableLabel}` : "Takeaway order"}</p>
-        <h1 className="font-display text-3xl font-bold leading-tight">{shop.name}</h1>
-        {shop.address ? <p className="mt-1 text-sm text-white/75">{shop.address}</p> : null}
+    <div className="brand mx-auto min-h-dvh max-w-xl bg-paper pb-28" style={brandStyle(shop.brandColor)}>
+      <header className="bg-pandan px-5 pb-5 pt-6 text-on-brand">
+        <p className="text-sm opacity-80">{tableLabel ? `You're at ${tableLabel}` : "Takeaway order"}</p>
+        <div className="mt-1.5 flex items-center gap-3">
+          <ShopLogo name={shop.name} src={shop.logoUrl} className="size-14" />
+          <h1 className="min-w-0 font-display text-3xl font-bold leading-tight">{shop.name}</h1>
+        </div>
+        {shop.tagline ? <p className="mt-2 text-sm opacity-90">{shop.tagline}</p> : null}
+        {shop.address ? <p className="mt-1 text-xs opacity-75">{shop.address}</p> : null}
       </header>
 
       <nav className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b border-line bg-paper/95 px-4 py-3 backdrop-blur">
@@ -103,7 +109,7 @@ export function CustomerMenu({
             href={`#cat-${c.id}`}
             className={cn(
               "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold",
-              activeCat === c.id ? "bg-ink text-white" : "bg-surface text-ink-soft border border-line",
+              activeCat === c.id ? "bg-ink text-on-ink" : "bg-surface text-ink-soft border border-line",
             )}
           >
             {c.name}
@@ -134,17 +140,14 @@ export function CustomerMenu({
                     onClick={() => setPicking(item)}
                     className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-paper"
                   >
-                    {item.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.imageUrl} alt="" className="size-16 shrink-0 rounded-lg object-cover" />
-                    ) : null}
+                    <ItemThumb name={item.name} src={item.imageUrl} className="size-18" />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{item.name}</p>
                       {item.description ? <p className="line-clamp-2 text-sm text-ink-soft">{item.description}</p> : null}
                       <p className="num mt-0.5 text-sm font-semibold text-pandan-dark">{rm(item.price)}</p>
                     </div>
                     {inCart ? (
-                      <span className="num grid size-8 place-items-center rounded-full bg-pandan text-sm font-bold text-white">
+                      <span className="num grid size-8 place-items-center rounded-full bg-pandan text-sm font-bold text-on-brand">
                         {inCart}
                       </span>
                     ) : (
@@ -164,7 +167,7 @@ export function CustomerMenu({
         <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-xl p-3">
           <button
             onClick={() => setCartOpen(true)}
-            className="flex h-14 w-full items-center justify-between rounded-xl bg-ink px-5 text-white shadow-lg"
+            className="flex h-14 w-full items-center justify-between rounded-xl bg-ink px-5 text-on-ink shadow-lg"
           >
             <span className="flex items-center gap-2 font-semibold">
               <ShoppingBag className="size-5" aria-hidden /> View order ({count})
@@ -227,7 +230,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={title}>
-      <button className="absolute inset-0 bg-ink/50" onClick={onClose} aria-label="Close" />
+      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
       <div className="relative flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-2xl bg-surface">
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="font-display text-xl font-bold">{title}</h2>
@@ -295,6 +298,10 @@ function ItemSheet({
   return (
     <Sheet title={item.name} onClose={onClose}>
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageUrl} alt={item.name} className="aspect-[4/3] w-full rounded-xl object-cover" />
+        ) : null}
         {item.description ? <p className="text-ink-soft">{item.description}</p> : null}
         {item.groups.map((g) => (
           <fieldset key={g.id}>
@@ -460,7 +467,7 @@ function CartSheet({
         >
           {pending ? "Sending to kitchen…" : "Send order to kitchen"}
         </Button>
-        <p className="mt-2 text-center text-xs text-mute">You can pay online now or at the counter after.</p>
+        <p className="mt-2 text-center text-xs text-mute">Pay at the counter when you are done.</p>
       </div>
     </Sheet>
   );

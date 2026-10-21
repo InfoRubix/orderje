@@ -14,8 +14,8 @@ import { dayRange, myDate } from "./time";
  * A busy kedai does a few hundred orders a day, so even a 30-day dashboard is a few thousand small reads.
  */
 
-const METHODS: PaymentMethod[] = ["cash", "duitnow_qr", "online", "credit"];
-const zeroMethods = () => ({ cash: 0, duitnow_qr: 0, online: 0, credit: 0 }) as Record<PaymentMethod, number>;
+const METHODS: PaymentMethod[] = ["cash", "duitnow_qr", "credit"];
+const zeroMethods = () => ({ cash: 0, duitnow_qr: 0, credit: 0 }) as Record<PaymentMethod, number>;
 
 /**
  * Money received on one business date, counted by when the payment was confirmed
@@ -39,11 +39,9 @@ export async function reconSummary(tenantId: string, date: string) {
     } else settlements[p.method] += p.amount;
   }
 
-  const openOrders = created.filter(
-    (o) => o.status !== "cancelled" && (o.paymentStatus === "unpaid" || o.paymentStatus === "pending"),
-  ).length;
+  const open = created.filter((o) => o.status !== "cancelled" && o.paymentStatus === "unpaid");
 
-  const electronicPays = pays.filter((p) => p.method === "duitnow_qr" || p.method === "online");
+  const electronicPays = pays.filter((p) => p.method === "duitnow_qr");
   const orderNos = new Map<string, number>();
   await Promise.all(
     [...new Set(electronicPays.map((p) => p.orderId).filter((id): id is string => Boolean(id)))].map(async (id) => {
@@ -58,7 +56,8 @@ export async function reconSummary(tenantId: string, date: string) {
     countByMethod,
     settlements,
     collected: METHODS.filter((m) => m !== "credit").reduce((s, m) => s + byMethod[m] + settlements[m], 0),
-    openOrders,
+    openOrders: open.length,
+    openOrderNos: open.map((o) => o.orderNo).sort((a, b) => a - b),
     electronic: electronicPays.map((p) => ({
       id: p.id,
       orderId: p.orderId,

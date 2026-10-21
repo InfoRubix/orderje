@@ -4,12 +4,12 @@ import { CheckCircle2, ChefHat, Clock, HandPlatter, XCircle } from "lucide-react
 import type { OrderStatus } from "@/db/schema";
 import { getOrderByToken } from "@/lib/orders";
 import { getTenant } from "@/lib/repo";
-import { toyyibpayReady } from "@/lib/toyyibpay";
 import { rm } from "@/lib/money";
 import { ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { PayOptions } from "./pay";
+import { brandStyle } from "@/lib/brand";
+import { ShopLogo } from "@/components/thumb";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Your order" };
@@ -32,12 +32,15 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
   const done = order.status === "cancelled" || (order.status === "served" && settled);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl pb-10">
+    <main className="brand mx-auto min-h-dvh max-w-xl pb-10" style={brandStyle(tenant.brandColor)}>
       <AutoRefresh every={5000} enabled={!done} />
-      <header className="bg-pandan px-5 pb-6 pt-6 text-white">
-        <p className="text-sm text-white/75">{tenant.name}</p>
-        <h1 className="font-display text-4xl font-bold">Order #{order.orderNo}</h1>
-        <p className="mt-1 text-white/80">
+      <header className="bg-pandan px-5 pb-6 pt-6 text-on-brand">
+        <p className="flex items-center gap-2 text-sm opacity-80">
+          <ShopLogo name={tenant.name} src={tenant.logoUrl} className="size-7 rounded-md text-sm" />
+          {tenant.name}
+        </p>
+        <h1 className="mt-1 font-display text-4xl font-bold">Order #{order.orderNo}</h1>
+        <p className="mt-1 opacity-85">
           {ORDER_TYPE_LABEL[order.orderType]}
           {order.tableLabel ? `, ${order.tableLabel}` : ""}
           {order.customerName ? `, ${order.customerName}` : ""}
@@ -60,7 +63,7 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
                   <span
                     className={cn(
                       "mx-auto grid size-11 place-items-center rounded-full",
-                      reached ? "bg-pandan text-white" : "bg-line text-mute",
+                      reached ? "bg-pandan text-on-brand" : "bg-line text-mute",
                       i === stepIdx && "ring-4 ring-pandan/20",
                     )}
                   >
@@ -113,14 +116,13 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
               </Link>
             </div>
           ) : (
-            <PayOptions
-              token={order.publicToken}
-              total={order.total}
-              pending={order.paymentStatus === "pending"}
-              pendingMethod={order.payments.find((p) => p.status === "pending")?.method}
-              online={toyyibpayReady(tenant)}
-              qrUrl={tenant.allowQrCounterPay ? tenant.duitnowQrUrl : null}
-            />
+            <div className="rounded-xl border border-line bg-surface p-5 text-center">
+              <p className="text-sm text-ink-soft">Please pay at the counter</p>
+              <p className="num font-display text-4xl font-bold">{rm(order.total)}</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Cash or DuitNow QR. Show order #{order.orderNo} to the cashier.
+              </p>
+            </div>
           )
         ) : null}
 

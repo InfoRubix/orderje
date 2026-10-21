@@ -36,6 +36,5 @@ export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = {
 export const METHOD_LABEL = {
   cash: "Cash",
   duitnow_qr: "DuitNow QR",
-  online: "Online (FPX)",
   credit: "Corporate credit",
 } as const;

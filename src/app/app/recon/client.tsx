@@ -6,12 +6,11 @@ import { cn } from "@/lib/utils";
 import { Button, Card, Field, FormError, Input, Textarea } from "@/components/ui";
 import { closeDay, reopenDay } from "../actions";
 
-export function CloseDayForm({ date, expected }: { date: string; expected: { cash: number; qr: number; online: number } }) {
+export function CloseDayForm({ date, expected }: { date: string; expected: { cash: number; qr: number } }) {
   const [state, action, pending] = useActionState(closeDay, undefined);
   const [float, setFloat] = useState("0");
   const [cash, setCash] = useState("");
   const [qr, setQr] = useState("");
-  const [online, setOnline] = useState("");
   const v = (s: string) => {
     const n = toSen(s || "0");
     return Number.isFinite(n) ? n : 0;
@@ -19,7 +18,6 @@ export function CloseDayForm({ date, expected }: { date: string; expected: { cas
   const diffs = {
     cash: cash === "" ? null : v(cash) - v(float) - expected.cash,
     qr: qr === "" ? null : v(qr) - expected.qr,
-    online: online === "" ? null : v(online) - expected.online,
   };
   const Diff = ({ d }: { d: number | null }) =>
     d === null ? null : (
@@ -31,7 +29,7 @@ export function CloseDayForm({ date, expected }: { date: string; expected: { cas
   return (
     <Card className="p-5">
       <h2 className="font-display text-lg font-bold">Close {date}</h2>
-      <p className="mb-4 text-sm text-ink-soft">Count the drawer and check your bank and ToyyibPay, then enter what you see.</p>
+      <p className="mb-4 text-sm text-ink-soft">Count the drawer and check your bank app, then enter what you see.</p>
       <form action={action} className="space-y-4">
         <input type="hidden" name="date" value={date} />
         <Field label="Opening float (RM)" hint="Cash in the drawer before the first sale">
@@ -45,10 +43,6 @@ export function CloseDayForm({ date, expected }: { date: string; expected: { cas
           <Input name="bankQr" value={qr} onChange={(e) => setQr(e.target.value)} inputMode="decimal" className="num" required />
         </Field>
         <Diff d={diffs.qr} />
-        <Field label="Online in ToyyibPay (RM)" hint={`System expects ${rm(expected.online)}`}>
-          <Input name="gatewayOnline" value={online} onChange={(e) => setOnline(e.target.value)} inputMode="decimal" className="num" required />
-        </Field>
-        <Diff d={diffs.online} />
         <Field label="Notes" hint="Explain any difference, e.g. RM5 given as change by mistake">
           <Textarea name="notes" maxLength={500} />
         </Field>

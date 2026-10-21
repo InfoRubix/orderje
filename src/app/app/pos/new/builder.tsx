@@ -80,7 +80,7 @@ export function CounterOrder({
               onClick={() => setCat(c.id)}
               className={cn(
                 "shrink-0 rounded-full px-4 py-2 text-sm font-semibold",
-                cat === c.id ? "bg-ink text-white" : "border border-line bg-surface text-ink-soft",
+                cat === c.id ? "bg-ink text-on-ink" : "border border-line bg-surface text-ink-soft",
               )}
             >
               {c.name}
@@ -246,7 +246,7 @@ function OptionsDialog({
   };
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal aria-label={item.name}>
-      <button className="absolute inset-0 bg-ink/50" onClick={onClose} aria-label="Close" />
+      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
       <div className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5">
         <div className="mb-4 flex items-start justify-between">
           <h2 className="font-display text-xl font-bold">{item.name}</h2>

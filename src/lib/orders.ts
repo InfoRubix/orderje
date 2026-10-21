@@ -14,8 +14,7 @@ import type {
 import { computeTotals } from "./pricing";
 import { cashRound } from "./money";
 import { getCustomer, getTenant, listCategories } from "./repo";
-import { appUrl, token, uid } from "./utils";
-import { createBill, isBillPaid, toyyibpayReady } from "./toyyibpay";
+import { token, uid } from "./utils";
 
 export class OrderError extends Error {}
 
@@ -175,8 +174,6 @@ export async function setOrderCustomer(
   if (!order) throw new OrderError("Order not found.");
   if (order.paymentStatus === "paid" || order.paymentStatus === "credit")
     throw new OrderError("This order is already settled.");
-  if (order.paymentStatus === "pending")
-    throw new OrderError("Confirm or reject the pending payment before changing the customer.");
   const tenant = (await getTenant(tenantId))!;
   const customer = await resolveCustomer(tenantId, customerType, customerId);
   const totals = computeTotals(tenant, order.subtotal, customerType, order.orderType);
@@ -236,7 +233,6 @@ function newPayment(p: Partial<Payment> & Pick<Payment, "tenantId" | "method" | 
     tendered: null,
     changeGiven: null,
     reference: null,
-    gatewayBillCode: null,
     receivedBy: null,
     confirmedAt: null,
     createdAt: new Date(),
@@ -244,13 +240,10 @@ function newPayment(p: Partial<Payment> & Pick<Payment, "tenantId" | "method" | 
   };
 }
 
-const pendingFor = (tenantId: string, orderId: string) =>
-  col.of(tenantId, "payments").where("orderId", "==", orderId).where("status", "==", "pending");
-
 export type PayInput = {
   tenant: Tenant;
   orderId: string;
-  method: Exclude<PaymentMethod, "online">;
+  method: PaymentMethod;
   tenderedSen?: number;
   reference?: string | null;
   userId: string;
@@ -296,10 +289,8 @@ export async function payAtCounter(p: PayInput) {
     const fresh = read<Order>(await tx.get(orderRef));
     if (!fresh || fresh.paymentStatus === "paid" || fresh.paymentStatus === "credit")
       throw new OrderError("This order is already settled.");
+    if (fresh.status === "cancelled") throw new OrderError("This order was cancelled.");
     if (fresh.total !== order.total) throw new OrderError("The bill changed while you were paying. Check the total and try again.");
-    // Any pending online/QR attempt is superseded by the counter payment.
-    const pending = await tx.get(pendingFor(p.tenant.id, order.id));
-    for (const d of pending.docs) tx.update(d.ref, { status: "failed" });
     tx.create(
       col.of(p.tenant.id, "payments").doc(uid()),
       newPayment({
@@ -317,140 +308,7 @@ export async function payAtCounter(p: PayInput) {
         createdAt: now,
       }),
     );
-    tx.update(orderRef, { paymentStatus, paidAt: now, rounding, total: order.total + rounding });
+    tx.update(orderRef, { paymentStatus, paidMethod: p.method, paidAt: now, rounding, total: order.total + rounding });
   });
   return { changeGiven, amount };
-}
-
-/** Customer tapped "I've paid by DuitNow QR": parks a pending payment for the cashier to confirm. */
-export async function declareQrPayment(publicToken: string) {
-  const order = await getOrderByToken(publicToken);
-  if (!order) throw new OrderError("Order not found.");
-  const orderRef = col.of(order.tenantId, "orders").doc(order.id);
-  await fs().runTransaction(async (tx) => {
-    const fresh = read<Order>(await tx.get(orderRef));
-    if (!fresh || fresh.paymentStatus !== "unpaid" || fresh.status === "cancelled") return;
-    tx.create(
-      col.of(order.tenantId, "payments").doc(uid()),
-      newPayment({ tenantId: order.tenantId, orderId: order.id, method: "duitnow_qr", status: "pending", amount: fresh.total }),
-    );
-    tx.update(orderRef, { paymentStatus: "pending" });
-  });
-}
-
-/** Cashier confirms or rejects a pending QR / online payment. */
-export async function resolvePendingPayment(
-  tenantId: string,
-  paymentId: string,
-  ok: boolean,
-  userId: string,
-  reference?: string | null,
-) {
-  if (ok && !reference?.trim()) {
-    const pay = read<Payment>(await col.of(tenantId, "payments").doc(paymentId).get());
-    if (pay?.method === "duitnow_qr") throw new OrderError("Enter the bank reference before confirming.");
-  }
-  const payRef = col.of(tenantId, "payments").doc(paymentId);
-  const now = new Date();
-  await fs().runTransaction(async (tx) => {
-    const pay = read<Payment>(await tx.get(payRef));
-    if (!pay || pay.status !== "pending" || !pay.orderId) throw new OrderError("Payment is no longer pending.");
-    tx.update(payRef, {
-      status: ok ? "success" : "failed",
-      confirmedAt: ok ? now : null,
-      receivedBy: userId,
-      reference: reference?.trim().slice(0, 120) || pay.reference,
-    });
-    tx.update(
-      col.of(tenantId, "orders").doc(pay.orderId),
-      ok ? { paymentStatus: "paid", paidAt: now } : { paymentStatus: "unpaid" },
-    );
-  });
-}
-
-/* ----------------------------- Online (gateway) ---------------------------- */
-
-export async function startOnlinePayment(publicToken: string) {
-  const order = await getOrderByToken(publicToken);
-  if (!order) throw new OrderError("Order not found.");
-  if (order.status === "cancelled") throw new OrderError("This order was cancelled.");
-  if (order.paymentStatus === "paid" || order.paymentStatus === "credit") throw new OrderError("Already paid.");
-  if (order.paymentStatus === "pending")
-    throw new OrderError("A payment is already waiting for confirmation. Ask the counter if it doesn't clear.");
-  const tenant = (await getTenant(order.tenantId))!;
-  if (!toyyibpayReady(tenant)) throw new OrderError("Online payment isn't set up for this kedai. Pay at the counter.");
-
-  const paymentId = uid();
-  const bill = await createBill(tenant, {
-    amountSen: order.total,
-    billName: `${tenant.name}`.slice(0, 30),
-    description: `Order #${order.orderNo}${order.tableLabel ? ` ${order.tableLabel}` : ""}`,
-    externalRef: paymentId,
-    returnUrl: `${appUrl()}/api/pay/toyyibpay/return?o=${order.publicToken}`,
-    callbackUrl: `${appUrl()}/api/pay/toyyibpay/callback`,
-    payorName: order.customerName,
-    payorPhone: order.customerPhone,
-  });
-  const orderRef = col.of(tenant.id, "orders").doc(order.id);
-  await fs().runTransaction(async (tx) => {
-    const fresh = read<Order>(await tx.get(orderRef));
-    if (!fresh || fresh.paymentStatus !== "unpaid") throw new OrderError("This bill was just paid or is being paid.");
-    tx.create(
-      col.of(tenant.id, "payments").doc(paymentId),
-      newPayment({
-        tenantId: tenant.id,
-        orderId: order.id,
-        customerId: order.customerId,
-        method: "online",
-        status: "pending",
-        amount: fresh.total,
-        gatewayBillCode: bill.billCode,
-      }),
-    );
-    tx.create(col.bills().doc(bill.billCode), { tenantId: tenant.id, paymentId });
-    tx.update(orderRef, { paymentStatus: "pending" });
-  });
-  return bill.paymentUrl;
-}
-
-async function paymentByBill(billCode: string) {
-  if (!billCode || billCode.includes("/")) return undefined;
-  const ref = await col.bills().doc(billCode).get();
-  if (!ref.exists) return undefined;
-  const tenantId = String(ref.get("tenantId"));
-  return read<Payment>(await col.of(tenantId, "payments").doc(String(ref.get("paymentId"))).get());
-}
-
-/** Called from both the gateway callback and the return redirect; idempotent. */
-export async function settleOnlinePayment(billCode: string) {
-  const pay = await paymentByBill(billCode);
-  if (!pay || !pay.orderId) return { ok: false as const };
-  if (pay.status === "success") return { ok: true as const, orderId: pay.orderId };
-  if (pay.status !== "pending") return { ok: false as const };
-  const tenant = (await getTenant(pay.tenantId))!;
-  const check = await isBillPaid(tenant, billCode, pay.amount);
-  if (!check.paid) return { ok: false as const };
-  const payRef = col.of(pay.tenantId, "payments").doc(pay.id);
-  const now = new Date();
-  await fs().runTransaction(async (tx) => {
-    const fresh = read<Payment>(await tx.get(payRef));
-    if (!fresh || fresh.status !== "pending") return;
-    tx.update(payRef, { status: "success", confirmedAt: now, reference: check.reference });
-    tx.update(col.of(pay.tenantId, "orders").doc(pay.orderId!), { paymentStatus: "paid", paidAt: now });
-  });
-  return { ok: true as const, orderId: pay.orderId };
-}
-
-/** Customer came back from the gateway without paying: free the order for another method. */
-export async function abandonOnlinePayment(billCode: string) {
-  const pay = await paymentByBill(billCode);
-  if (!pay || pay.status !== "pending" || !pay.orderId) return;
-  const payRef = col.of(pay.tenantId, "payments").doc(pay.id);
-  const orderRef = col.of(pay.tenantId, "orders").doc(pay.orderId);
-  await fs().runTransaction(async (tx) => {
-    const [fresh, order] = await Promise.all([tx.get(payRef), tx.get(orderRef)]);
-    if (fresh.get("status") !== "pending") return;
-    tx.update(payRef, { status: "failed" });
-    if (order.get("paymentStatus") === "pending") tx.update(orderRef, { paymentStatus: "unpaid" });
-  });
 }

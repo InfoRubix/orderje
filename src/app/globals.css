@@ -3,6 +3,7 @@
 /*
   OrderJe tokens. Pandan green for go/paid, teh amber for waiting, chili red for problems.
   Cool paper background, slate ink. Tickets borrow the thermal-receipt look.
+  Dark mode follows the device. On customer pages, .brand swaps pandan for the kedai's colour.
 */
 @theme {
   --color-ink: #1d2433;
@@ -19,9 +20,47 @@
   --color-chili: #c23a2f;
   --color-chili-soft: #fbe7e5;
   --color-slip: #fffdf7;
+  --color-rail: #1d2433;
+  --color-on-ink: #ffffff;
+  --color-on-brand: #ffffff;
 
   --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Bricolage Grotesque Variable", "Instrument Sans Variable", ui-sans-serif, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink: #e8ebf1;
+    --color-ink-soft: #b3bacb;
+    --color-mute: #8a93a6;
+    --color-paper: #12161f;
+    --color-surface: #1a1f2b;
+    --color-line: #2b3242;
+    --color-pandan: #2f9a65;
+    --color-pandan-dark: #6fd3a0;
+    --color-pandan-soft: #173528;
+    --color-teh: #e2a552;
+    --color-teh-soft: #3a2c17;
+    --color-chili: #ef6b5f;
+    --color-chili-soft: #3d1e1c;
+    --color-slip: #222837;
+    --color-rail: #0c0f15;
+    --color-on-ink: #12161f;
+    color-scheme: dark;
+  }
+}
+
+/* Customer-facing pages: the kedai's brand colour (set inline as --brand / --on-brand / --brand-shade). */
+.brand {
+  --color-pandan: var(--brand);
+  --color-pandan-dark: color-mix(in srgb, var(--brand) var(--brand-shade), #000);
+  --color-pandan-soft: color-mix(in srgb, var(--brand) 14%, var(--color-surface));
+  --color-on-brand: var(--on-brand);
+}
+@media (prefers-color-scheme: dark) {
+  .brand {
+    --color-pandan-dark: color-mix(in srgb, var(--brand) 55%, #fff);
+  }
 }
 
 html,
@@ -60,6 +99,17 @@ body {
 }
 
 @media print {
+  /* Receipts and QR sheets always print dark-on-white. */
+  :root {
+    --color-ink: #1d2433;
+    --color-ink-soft: #4b5468;
+    --color-mute: #7b8496;
+    --color-paper: #ffffff;
+    --color-surface: #ffffff;
+    --color-line: #e2e5eb;
+    --color-slip: #ffffff;
+    color-scheme: light;
+  }
   body {
     background: #fff;
   }

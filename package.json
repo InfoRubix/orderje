@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "emulators": "firebase emulators:start --only firestore --project demo-orderje",
-    "deploy:rules": "firebase deploy --only firestore"
+    "emulators": "firebase emulators:start --only firestore,storage --project demo-orderje",
+    "deploy:rules": "firebase deploy --only firestore:rules,storage"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

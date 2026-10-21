@@ -37,8 +37,10 @@ export function TableCard({
   svg,
   active = true,
   caption,
+  color,
 }: {
   id?: string;
+  color: string;
   shop: string;
   label: string;
   url: string;
@@ -58,14 +60,17 @@ export function TableCard({
     });
 
   return (
-    <div className={cn("break-inside-avoid rounded-xl border border-line bg-surface p-4 text-center", !active && "opacity-50 print:hidden")}>
+    <div
+      className={cn("break-inside-avoid rounded-xl border border-t-4 border-line bg-surface p-4 text-center", !active && "opacity-50 print:hidden")}
+      style={{ borderTopColor: color }}
+    >
       <p className="text-xs text-ink-soft">{shop}</p>
       <p className="font-display text-xl font-bold">{label}</p>
       <div className="mx-auto my-2 w-full max-w-44 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
       <p className="text-sm font-semibold">{caption}</p>
       <div className="no-print mt-3 space-y-2 border-t border-line pt-3 text-left">
-        <a href={url} target="_blank" className="block truncate text-xs text-pandan underline">
-          Open link
+        <a href={url} target="_blank" rel="noreferrer" className="block text-sm font-semibold text-pandan-dark hover:underline">
+          Open as customer
         </a>
         {id ? (
           editing ? (

@@ -110,9 +110,8 @@ function SettleForm({ customerId, owing, onDone }: { customerId: string; owing: 
         <Input name="amount" defaultValue={(owing / 100).toFixed(2)} inputMode="decimal" className="num" />
       </Field>
       <Field label="Paid by">
-        <Select name="method" defaultValue="online">
-          <option value="online">Bank transfer</option>
-          <option value="duitnow_qr">DuitNow QR</option>
+        <Select name="method" defaultValue="duitnow_qr">
+          <option value="duitnow_qr">Bank transfer / DuitNow QR</option>
           <option value="cash">Cash</option>
         </Select>
       </Field>

@@ -9,7 +9,7 @@ import { Badge, buttonVariants, Empty, Input, PageHeader } from "@/components/ui
 export const metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
 
-const PAY_TONE = { paid: "green", credit: "green", pending: "amber", unpaid: "red" } as const;
+const PAY_TONE = { paid: "green", credit: "green", unpaid: "red" } as const;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { tenant } = await requireUser(["owner", "cashier"]);

@@ -12,8 +12,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Scan, order, makan. The counter just collects.
           </p>
           <p className="mt-4 text-white/80">
-            Customers order from the QR on their table. The kitchen sees it instantly. At closing, cash, QR and
-            online payments reconcile in one screen.
+            Customers order from the QR on their table. The kitchen sees it instantly. At closing, cash and
+            DuitNow QR reconcile in one screen.
           </p>
         </div>
         <p className="text-sm text-white/60">A Rubix Technology product</p>

@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { col, fs, isAlreadyExists } from "@/db";
-import type { Tenant, User } from "@/db/schema";
+import { DEFAULT_BRAND_COLOR, type Tenant, type User } from "@/db/schema";
 import { getTenant, getUserByEmail } from "@/lib/repo";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 import { homeFor } from "@/lib/auth";
@@ -64,18 +64,17 @@ export async function signup(_: AuthState, form: FormData): Promise<AuthState> {
   const tenant: Omit<Tenant, "id"> = {
     slug: d.slug,
     name: d.shopName,
+    tagline: null,
     address: null,
     phone: null,
     email: d.email,
+    logoUrl: null,
+    logoPath: null,
+    brandColor: DEFAULT_BRAND_COLOR,
     sstRate: 0,
     serviceChargeRate: 0,
     memberDiscountRate: 500,
     staffDiscountRate: 2000,
-    duitnowQrUrl: null,
-    toyyibpaySecret: null,
-    toyyibpayCategory: null,
-    toyyibpaySandbox: true,
-    allowQrCounterPay: true,
     receiptFooter: null,
     orderSeq: 0,
     active: true,

@@ -24,7 +24,6 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
   const expected = {
     cash: s.byMethod.cash + s.settlements.cash,
     qr: s.byMethod.duitnow_qr + s.settlements.duitnow_qr,
-    online: s.byMethod.online,
   };
   const c = s.closed;
 
@@ -32,7 +31,7 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
     <div className="max-w-5xl">
       <PageHeader
         title="End-of-day recon"
-        sub="Check what the system recorded against your drawer, bank app and ToyyibPay."
+        sub="Check what the system recorded against your cash drawer and bank app."
         actions={
           <form className="flex gap-2">
             <Input type="date" name="date" defaultValue={date} max={today} aria-label="Business date" />
@@ -67,11 +66,10 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
                 />
                 <Line
                   name="DuitNow QR"
-                  sub={plural(s.countByMethod.duitnow_qr, "payment")}
+                  sub={`${plural(s.countByMethod.duitnow_qr, "payment")}${s.settlements.duitnow_qr ? ` + ${rm(s.settlements.duitnow_qr)} credit settled` : ""}`}
                   system={expected.qr}
                   actual={c?.bankQr}
                 />
-                <Line name="Online (FPX)" sub={plural(s.countByMethod.online, "payment")} system={expected.online} actual={c?.gatewayOnline} />
                 <tr className="text-ink-soft">
                   <td className="px-5 py-3">
                     Corporate credit
@@ -80,13 +78,6 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
                   <td className="px-5 py-3 text-right">{rm(s.byMethod.credit)}</td>
                   <td colSpan={2} className="px-5 py-3 text-right text-xs">Not counted in today&apos;s money</td>
                 </tr>
-                {s.settlements.online ? (
-                  <tr className="text-ink-soft">
-                    <td className="px-5 py-3">Credit settled by bank transfer</td>
-                    <td className="px-5 py-3 text-right">{rm(s.settlements.online)}</td>
-                    <td colSpan={2} className="px-5 py-3 text-right text-xs">Check in your bank statement</td>
-                  </tr>
-                ) : null}
               </tbody>
             </table>
             {c ? (
@@ -99,11 +90,11 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
 
           <Card className="overflow-hidden">
             <div className="border-b border-line px-5 py-3">
-              <h2 className="font-display text-lg font-bold">QR & online payments to tick off</h2>
-              <p className="text-sm text-ink-soft">Match each one against your bank app or ToyyibPay report.</p>
+              <h2 className="font-display text-lg font-bold">DuitNow QR payments to tick off</h2>
+              <p className="text-sm text-ink-soft">Match each one against your bank app.</p>
             </div>
             {s.electronic.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-mute">No QR or online payments on this day.</p>
+              <p className="px-5 py-4 text-sm text-mute">No DuitNow QR payments on this day.</p>
             ) : (
               <ul className="divide-y divide-line text-sm">
                 {s.electronic.map((p) => (
@@ -111,7 +102,7 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
                     <label className="flex flex-1 items-center gap-3">
                       <input type="checkbox" className="size-4 accent-pandan" aria-label={`Ticked ${p.reference ?? p.id}`} />
                       <span className="num w-16 text-ink-soft">{p.confirmedAt ? fmtTime(p.confirmedAt) : ""}</span>
-                      <span className="font-medium">{p.method === "online" ? "FPX" : "QR"}</span>
+                      <span className="font-medium">QR</span>
                       <span className="text-ink-soft">
                         {p.kind === "settlement" ? "Credit settlement" : p.orderId ? `Order #${p.orderNo}` : ""}
                       </span>
@@ -136,8 +127,8 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
             <Card className="space-y-3 border-teh/40 bg-teh-soft p-5">
               <p className="font-display text-lg font-bold text-teh">Can&apos;t close yet</p>
               <p className="text-sm">
-                {s.openOrders} order{s.openOrders === 1 ? " is" : "s are"} unpaid or waiting for payment confirmation. Settle or
-                cancel {s.openOrders === 1 ? "it" : "them"} first.
+                {s.openOrders} order{s.openOrders === 1 ? " is" : "s are"} still unpaid (
+                {s.openOrderNos.map((n) => `#${n}`).join(", ")}). Settle or cancel {s.openOrders === 1 ? "it" : "them"} first.
               </p>
               <Link href="/app/pos" className={buttonVariants({ variant: "amber" })}>
                 Open counter
@@ -155,7 +146,7 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
               <ul className="divide-y divide-line text-sm">
                 {history.map(({ r }) => {
                   const diff =
-                    r.countedCash - r.openingFloat - r.expectedCash + (r.bankQr - r.expectedQr) + (r.gatewayOnline - r.expectedOnline);
+                    r.countedCash - r.openingFloat - r.expectedCash + (r.bankQr - r.expectedQr);
                   return (
                     <li key={r.id}>
                       <Link href={`/app/recon?date=${r.businessDate}`} className="flex justify-between py-2 hover:underline">

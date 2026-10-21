@@ -52,7 +52,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           <Badge tone={order.status === "cancelled" ? "red" : order.status === "served" ? "neutral" : "amber"} className="capitalize">
             {order.status}
           </Badge>
-          <Badge tone={settled ? "green" : order.paymentStatus === "pending" ? "amber" : "red"} className="capitalize">
+          <Badge tone={settled ? "green" : "red"} className="capitalize">
             {order.paymentStatus === "credit" ? "On credit" : order.paymentStatus}
           </Badge>
         </div>
@@ -85,7 +85,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span className="font-semibold">{METHOD_LABEL[p.method]}</span>
                     <span className="num">{rm(p.amount)}</span>
-                    <Badge tone={p.status === "success" ? "green" : p.status === "pending" ? "amber" : "neutral"}>{p.status}</Badge>
+                    <Badge tone={p.status === "success" ? "green" : "neutral"}>{p.status === "failed" ? "voided" : "paid"}</Badge>
                     <span className="w-full text-ink-soft">
                       {fmtDateTime(p.confirmedAt ?? p.createdAt)}
                       {p.tendered ? ` · received ${rm(p.tendered)}, change ${rm(p.changeGiven ?? 0)}` : ""}
@@ -119,7 +119,6 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           customers={custList}
           owing={owing}
           labels={CUSTOMER_TYPE_LABEL}
-          qrConfigured={Boolean(tenant.duitnowQrUrl)}
         />
       </div>
     </div>

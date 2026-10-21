@@ -39,12 +39,12 @@ export function BarChart({
             <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-line" />
             {hover !== null ? (
               <div
-                className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] whitespace-nowrap rounded-lg bg-ink px-3 py-2 text-xs text-white shadow-lg"
+                className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] whitespace-nowrap rounded-lg bg-ink px-3 py-2 text-xs text-on-ink shadow-lg"
                 style={{ left: `${Math.min(90, Math.max(10, ((hover + 0.5) / data.length) * 100))}%` }}
               >
                 <p className="font-semibold">{data[hover].label}</p>
                 <p className="num">{rm(data[hover].value)}</p>
-                {data[hover].sub ? <p className="text-white/70">{data[hover].sub}</p> : null}
+                {data[hover].sub ? <p className="opacity-70">{data[hover].sub}</p> : null}
               </div>
             ) : null}
             {data.map((d, i) => (

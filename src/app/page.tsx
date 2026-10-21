@@ -22,8 +22,8 @@ export default async function Home() {
             Customers order from the table. You just cook and collect.
           </h1>
           <p className="mt-5 max-w-lg text-lg text-ink-soft">
-            QR ordering, kitchen screen, counter POS and end-of-day recon for kedai makan. Cash, DuitNow QR and FPX all land
-            in one place, and member, staff and corporate pricing is one tap at the counter.
+            QR ordering, kitchen screen, counter POS and end-of-day recon for kedai makan. Customers pay by cash,
+            DuitNow QR or company credit, and member, staff and corporate pricing is one tap at the counter.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             {process.env.ALLOW_SIGNUP !== "false" ? (
@@ -72,8 +72,8 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 md:grid-cols-3">
           {[
             ["Order from the table", "Every table gets its own QR. Customers pick add-ons like ais or kurang manis, and the order lands in the kitchen tagged with the table."],
-            ["Pay any way", "Cash with 5-sen rounding, DuitNow QR confirmed at the counter, FPX through your own ToyyibPay, or company credit settled monthly."],
-            ["Close the day in minutes", "Count the drawer, check the bank app, and see exactly where cash, QR and online are short or over."],
+            ["Pay any way", "Cash with 5-sen rounding, DuitNow QR confirmed against your bank app, or company credit settled monthly."],
+            ["Close the day in minutes", "Count the drawer, check the bank app, and see exactly where cash or QR is short or over."],
           ].map(([t, d]) => (
             <div key={t}>
               <h2 className="font-display text-xl font-bold">{t}</h2>

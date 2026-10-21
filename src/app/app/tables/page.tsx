@@ -34,6 +34,7 @@ export default async function TablesPage() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 print:grid-cols-3 print:gap-6">
         <TableCard
           shop={tenant.name}
+          color={tenant.brandColor}
           label="Takeaway"
           url={takeawayUrl}
           svg={takeawaySvg}
@@ -44,6 +45,7 @@ export default async function TablesPage() {
             key={t.id}
             id={t.id}
             shop={tenant.name}
+            color={tenant.brandColor}
             label={t.label}
             url={t.url}
             svg={t.svg}

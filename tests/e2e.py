@@ -1,11 +1,11 @@
 """
-End-to-end test of OrderJe: signup -> QR order -> kitchen -> QR/cash/credit payments
--> dashboard -> recon -> tenant isolation.
+End-to-end test of OrderJe: signup -> brand & menu photos -> QR order -> kitchen ->
+counter payments (DuitNow QR, cash, credit) -> dashboard -> recon -> tenant isolation.
 
 Runs against the Firestore emulator and WIPES it first. It refuses to run without one.
 
     pip install playwright && playwright install chromium
-    npm run emulators                     # terminal 1
+    npm run emulators                     # terminal 1 (Firestore + Storage)
     npm run build && npm start            # terminal 2 (.env.local points at the emulator)
     python3 tests/e2e.py
 """
@@ -71,17 +71,29 @@ with sync_playwright() as p:
     assert slug == "restoran-ali-maju", slug
     assert len(docs("menuItems")) > 0
 
-    step("settings: SST 6%, service 10%, DuitNow QR")
-    page.goto(f"{BASE}/app/settings")
+    step("brand & profile: logo, tagline, colour")
+    page.goto(f"{BASE}/app/brand")
+    page.fill("input[name=tagline]", "Mamak 24 jam sejak 1998")
     page.fill("input[name=address]", "12, Jalan 8/35, Seri Bangi")
     page.fill("input[name=phone]", "03-8920 1234")
+    page.get_by_role("button", name="Cili").click()
+    page.set_input_files("input[aria-label='Upload logo']", QR)
+    expect(page.get_by_alt_text("Current logo")).to_be_visible()
+    page.screenshot(path=f"{SHOTS}/00-brand.png", full_page=True)
+    page.get_by_role("button", name="Save", exact=True).click()
+    expect(page.get_by_text("Saved. Customers see it straight away.")).to_be_visible()
+    t = one("tenants")
+    assert (t["brandColor"], t["tagline"]) == ("#c23a2f", "Mamak 24 jam sejak 1998"), t
+    assert urllib.request.urlopen(t["logoUrl"]).status == 200, t["logoUrl"]
+
+    step("settings: SST 6%, service 10%")
+    page.goto(f"{BASE}/app/settings")
     page.fill("input[name=sstRate]", "6")
     page.fill("input[name=serviceChargeRate]", "10")
-    page.set_input_files("input[name=duitnowQr]", QR)
     page.click("button:has-text('Save settings')")
     expect(page.get_by_text("Settings saved.")).to_be_visible()
     t = one("tenants")
-    assert (t["sstRate"], t["serviceChargeRate"], t["duitnowQrUrl"] is not None) == (600, 1000, True), t
+    assert (t["sstRate"], t["serviceChargeRate"]) == (600, 1000), t
 
     step("add member + corporate customers")
     page.goto(f"{BASE}/app/customers?type=member")
@@ -104,6 +116,26 @@ with sync_playwright() as p:
     page.click("button:has-text('Add staff')")
     expect(page.get_by_text("Mei Ling can now log in.")).to_be_visible()
 
+    step("menu: photo upload, add item in the popup, reorder categories")
+    page.goto(f"{BASE}/app/menu")
+    page.get_by_role("button", name="Edit Nasi Lemak Biasa").click()
+    page.set_input_files("input[aria-label='Upload photo']", QR)
+    page.get_by_role("button", name="Save changes").click()
+    expect(page.get_by_text("Nasi Lemak Biasa saved")).to_be_visible()
+    nl = one("menuItems", name="Nasi Lemak Biasa")
+    assert nl["imagePath"] and urllib.request.urlopen(nl["imageUrl"]).status == 200, nl
+    assert len(nl["groups"]) == 1 and nl["groups"][0]["name"] == "Lauk tambah", nl["groups"]
+    page.get_by_role("button", name="+ Add item to Minuman").click()
+    page.get_by_placeholder("e.g. Nasi Ayam Penyet").fill("Air Kosong")
+    page.get_by_placeholder("8.50").fill("0.50")
+    page.get_by_role("button", name="Add to menu").click()
+    expect(page.get_by_text("Air Kosong added to the menu")).to_be_visible()
+    page.get_by_role("button", name="Move Minuman up").click()
+    page.wait_for_timeout(1500)
+    cats = {d["name"]: d["sort"] for d in docs("categories")}
+    assert cats["Minuman"] < cats["Roti"], cats
+    page.screenshot(path=f"{SHOTS}/05b-menu.png", full_page=True)
+
     step("tables page renders QR")
     page.goto(f"{BASE}/app/tables")
     assert page.locator("svg").count() >= 7
@@ -117,6 +149,8 @@ with sync_playwright() as p:
     c.on("pageerror", lambda e: errors.append(str(e)))
     c.goto(f"{BASE}/t/{slug}/{token}")
     expect(c.get_by_text("You're at Meja 3")).to_be_visible()
+    expect(c.get_by_text("Mamak 24 jam sejak 1998")).to_be_visible()
+    expect(c.get_by_alt_text("Restoran Ali Maju logo")).to_be_visible()
     c.screenshot(path=f"{SHOTS}/01-customer-menu.png")
     c.get_by_role("button", name=re.compile("Nasi Lemak Biasa")).click()
     c.get_by_label("Telur mata").check()
@@ -132,7 +166,7 @@ with sync_playwright() as p:
     c.screenshot(path=f"{SHOTS}/03-customer-cart.png")
     c.get_by_role("button", name="Send order to kitchen").click()
     c.wait_for_url(re.compile(r"/o/"))
-    expect(c.get_by_text("Order #1")).to_be_visible()
+    expect(c.get_by_role("heading", name="Order #1")).to_be_visible()
     # subtotal 8.00, service 0.80, sst 6% of 8.80 = 0.53 -> 9.33
     o1 = one("orders", orderNo=1)
     assert pick(o1, "subtotal", "serviceCharge", "sst", "total", "source", "orderType") == (800, 80, 53, 933, "qr", "dine_in"), o1
@@ -158,25 +192,26 @@ with sync_playwright() as p:
     page.wait_for_timeout(1500)
     assert one("orders", orderNo=1)["status"] == "ready"
 
-    step("customer sees Ready, pays by DuitNow QR")
+    step("customer is told to pay at the counter")
     c.reload()
-    c.get_by_role("button", name="Pay with DuitNow QR").click()
-    expect(c.get_by_alt_text("DuitNow QR code")).to_be_visible()
-    c.get_by_role("button", name="I've paid").click()
-    expect(c.get_by_text("Waiting for the counter to confirm")).to_be_visible()
-    c.screenshot(path=f"{SHOTS}/07-customer-qr-pending.png", full_page=True)
-    assert one("orders", orderNo=1)["paymentStatus"] == "pending"
+    expect(c.get_by_text("Please pay at the counter")).to_be_visible()
+    c.screenshot(path=f"{SHOTS}/07-customer-pay-at-counter.png", full_page=True)
 
-    step("counter confirms QR with bank ref")
+    step("counter takes DuitNow QR with bank ref")
     page.goto(f"{BASE}/app/pos")
-    expect(page.get_by_text("Confirm payments (1)")).to_be_visible()
+    expect(page.get_by_text("Unpaid bills (1)")).to_be_visible()
     page.screenshot(path=f"{SHOTS}/08-counter.png", full_page=True)
-    page.get_by_role("button", name="Received", exact=True).click()
-    expect(page.get_by_text("Enter the bank reference before confirming.")).to_be_visible()
-    page.get_by_label("Bank reference").fill("88231")
-    page.get_by_role("button", name="Received", exact=True).click()
+    page.get_by_role("link", name=re.compile("Meja 3")).first.click()
+    page.wait_for_url(re.compile(r"/app/orders/"))
+    page.get_by_role("button", name="DuitNow QR", exact=True).click()
+    receive = page.get_by_role("button", name=re.compile(r"^Receive RM 9\.33"))
+    expect(receive).to_be_disabled()  # bank reference is required
+    page.get_by_placeholder("Bank reference (last 4–6 digits)").fill("88231")
+    receive.click()
     page.wait_for_timeout(1500)
-    assert one("orders", orderNo=1)["paymentStatus"] == "paid"
+    o1 = one("orders", orderNo=1)
+    assert o1["paymentStatus"] == "paid", o1
+    assert one("payments", method="duitnow_qr")["reference"] == "88231"
     c.reload()
     expect(c.get_by_text("Paid. Terima kasih!")).to_be_visible()
 
@@ -271,7 +306,6 @@ with sync_playwright() as p:
     page.fill("input[name=openingFloat]", "50")
     page.fill("input[name=countedCash]", "66.50")  # expected 50 + 16.60 = 66.60
     page.fill("input[name=bankQr]", "9.33")
-    page.fill("input[name=gatewayOnline]", "0")
     expect(page.get_by_text("Short RM 0.10")).to_be_visible()
     page.screenshot(path=f"{SHOTS}/14-recon-form.png", full_page=True)
     page.fill("textarea[name=notes]", "10 sen short, probably change")

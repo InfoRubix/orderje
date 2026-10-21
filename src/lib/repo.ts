@@ -1,5 +1,6 @@
 import "server-only";
 import { col, read, readAll } from "@/db";
+import { DEFAULT_BRAND_COLOR } from "@/db/schema";
 import type {
   Category,
   Customer,
@@ -18,7 +19,9 @@ const bySortThenName = <T extends { sort: number; name?: string; label?: string 
   a.sort - b.sort || String(a.name ?? a.label ?? "").localeCompare(String(b.name ?? b.label ?? ""));
 
 export async function getTenant(id: string) {
-  return read<Tenant>(await col.tenants().doc(id).get());
+  const t = read<Tenant>(await col.tenants().doc(id).get());
+  // Kedai created before branding existed have no brand fields yet.
+  return t && { ...t, tagline: t.tagline ?? null, logoUrl: t.logoUrl ?? null, logoPath: t.logoPath ?? null, brandColor: t.brandColor || DEFAULT_BRAND_COLOR };
 }
 
 export async function getTenantBySlug(slug: string) {
@@ -92,11 +95,6 @@ export async function paymentsConfirmedBetween(tenantId: string, start: Date, en
     .orderBy("confirmedAt", "asc")
     .get();
   return readAll<Payment>(qs).filter((p) => p.status === "success");
-}
-
-export async function pendingPayments(tenantId: string) {
-  const list = readAll<Payment>(await col.of(tenantId, "payments").where("status", "==", "pending").get());
-  return list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 export async function getReconciliation(tenantId: string, date: string) {

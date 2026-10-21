@@ -5,6 +5,7 @@ import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { fmtDateTime } from "@/lib/time";
 import { appUrl } from "@/lib/utils";
+import { brandStyle } from "@/lib/brand";
 import { ReceiptActions } from "./actions-bar";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,17 @@ export default async function ReceiptPage({
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
 
   return (
-    <main className="min-h-dvh bg-paper py-6 print:bg-white print:py-0">
+    <main className="brand min-h-dvh bg-paper py-6 print:bg-white print:py-0" style={brandStyle(t.brandColor)}>
       <ReceiptActions
         autoPrint={print === "1"}
         shareText={`Receipt ${t.name} #${order.orderNo}: ${appUrl()}/r/${order.publicToken}`}
       />
       <article className="slip mx-auto w-[80mm] max-w-full px-4 pb-6 pt-5 font-mono text-[12px] leading-snug text-ink print:shadow-none print:after:hidden">
         <header className="text-center">
+          {t.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={t.logoUrl} alt="" className="mx-auto mb-2 size-14 object-contain grayscale" />
+          ) : null}
           <p className="font-sans text-base font-bold">{t.name}</p>
           {t.address ? <p>{t.address}</p> : null}
           {t.phone ? <p>Tel {t.phone}</p> : null}

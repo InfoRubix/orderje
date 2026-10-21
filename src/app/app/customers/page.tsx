@@ -39,7 +39,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             href={`/app/customers?type=${t.key}`}
             className={cn(
               "flex-1 rounded-md px-4 py-2 text-center text-sm font-semibold",
-              type === t.key ? "bg-ink text-white" : "text-ink-soft hover:text-ink",
+              type === t.key ? "bg-ink text-on-ink" : "text-ink-soft hover:text-ink",
             )}
           >
             {t.label}

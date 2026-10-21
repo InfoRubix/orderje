@@ -2,21 +2,21 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { col, fs, isAlreadyExists, read } from "@/db";
-import type {
-  Customer,
-  CustomerType,
-  DiningTable,
-  MenuItem,
-  ModifierGroup,
-  Order,
-  OrderStatus,
-  Payment,
-  Reconciliation,
-  Tenant,
-  User,
+import {
+  DEFAULT_BRAND_COLOR,
+  type Customer,
+  type CustomerType,
+  type DiningTable,
+  type MenuItem,
+  type ModifierGroup,
+  type Order,
+  type OrderStatus,
+  type Payment,
+  type Reconciliation,
+  type Tenant,
+  type User,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import {
@@ -25,10 +25,10 @@ import {
   OrderError,
   outstandingCredit,
   payAtCounter,
-  resolvePendingPayment,
   setOrderCustomer,
 } from "@/lib/orders";
-import { getCustomer, getUserByEmail, isDayClosed, listTables } from "@/lib/repo";
+import { getCustomer, getUserByEmail, isDayClosed, listCategories, listTables } from "@/lib/repo";
+import { deleteImage, deleteImages, putImage } from "@/lib/storage";
 import { reconSummary } from "@/lib/reports";
 import { seedTables } from "@/lib/seed-menu";
 import { toSen } from "@/lib/money";
@@ -87,12 +87,7 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
       if (!fresh || fresh.status !== o.status) throw new OrderError("Someone else just updated this order. Refresh and try again.");
       if (status === "cancelled" && (fresh.paymentStatus === "paid" || fresh.paymentStatus === "credit"))
         throw new OrderError("This order is paid. Refund it at the counter first.");
-      const pending =
-        status === "cancelled"
-          ? await tx.get(col.of(tenant.id, "payments").where("orderId", "==", o.id).where("status", "==", "pending"))
-          : null;
-      tx.update(orderRef, status === "cancelled" && fresh.paymentStatus === "pending" ? { status, paymentStatus: "unpaid" } : { status });
-      for (const d of pending?.docs ?? []) tx.update(d.ref, { status: "failed" });
+      tx.update(orderRef, { status });
     });
   } catch (e) {
     return fail(e);
@@ -174,18 +169,6 @@ export async function takePayment(
   }
 }
 
-export async function confirmPending(paymentId: string, ok: boolean, reference: string): Promise<ActionResult> {
-  const { user, tenant } = await requireUser(["owner", "cashier"]);
-  try {
-    if (ok) await assertOpenToday(tenant.id);
-    await resolvePendingPayment(tenant.id, paymentId, ok, user.id, reference);
-    revalidatePath("/app/pos");
-    return { ok: true };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
 /** Reverses a paid order (refund handed back at the counter) so it can be cancelled or re-paid. */
 export async function voidPayment(orderId: string, reason: string): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner"]);
@@ -202,7 +185,7 @@ export async function voidPayment(orderId: string, reason: string): Promise<Acti
       const paid = await tx.get(col.of(tenant.id, "payments").where("orderId", "==", o.id).where("status", "==", "success"));
       for (const d of paid.docs)
         tx.update(d.ref, { status: "failed", reference: `VOID by ${user.name}: ${reason.trim()}`.slice(0, 120) });
-      tx.update(orderRef, { paymentStatus: "unpaid", paidAt: null, total: fresh.total - fresh.rounding, rounding: 0 });
+      tx.update(orderRef, { paymentStatus: "unpaid", paidMethod: null, paidAt: null, total: fresh.total - fresh.rounding, rounding: 0 });
     });
   } catch (e) {
     return fail(e);
@@ -213,63 +196,139 @@ export async function voidPayment(orderId: string, reason: string): Promise<Acti
 
 /* ---------------------------------- Menu ---------------------------------- */
 
-export async function saveCategory(_: ActionResult, f: FormData): Promise<ActionResult> {
+export async function addCategory(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  const name = str(f, "name");
+  const name = str(f, "name").slice(0, 40);
   if (!name) return { error: "Enter a category name." };
-  const id = str(f, "id");
   const cats = col.of(tenant.id, "categories");
-  if (id) {
-    if (!(await cats.doc(id).get()).exists) return { error: "Category not found." };
-    await cats.doc(id).update({ name, sort: Number(str(f, "sort") || 0) });
-  } else {
-    const existing = (await cats.count().get()).data().count;
-    await cats.doc(uid()).create({ tenantId: tenant.id, name, sort: existing });
-  }
+  const existing = await listCategories(tenant.id);
+  await cats.doc(uid()).create({ tenantId: tenant.id, name, sort: (existing.at(-1)?.sort ?? -1) + 1 });
   revalidatePath("/app/menu");
   return { ok: true };
 }
 
+export async function renameCategory(id: string, name: string): Promise<ActionResult> {
+  const { tenant } = await requireUser(["owner"]);
+  const clean = name.trim().slice(0, 40);
+  if (!clean) return { error: "Enter a category name." };
+  const ref = col.of(tenant.id, "categories").doc(id);
+  if (!(await ref.get()).exists) return { error: "Category not found." };
+  await ref.update({ name: clean });
+  revalidatePath("/app/menu");
+  return { ok: true };
+}
+
+/** Swaps a category with its neighbour and renumbers the rest, so the order is always 0..n-1. */
+export async function moveCategory(id: string, dir: -1 | 1): Promise<ActionResult> {
+  const { tenant } = await requireUser(["owner"]);
+  const cats = await listCategories(tenant.id);
+  const i = cats.findIndex((c) => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= cats.length) return { ok: true };
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  const batch = fs().batch();
+  cats.forEach((c, n) => c.sort !== n && batch.update(col.of(tenant.id, "categories").doc(c.id), { sort: n }));
+  await batch.commit();
+  revalidatePath("/app/menu");
+  return { ok: true };
+}
+
+/** Deletes a category together with its items (the editor asks first). Past orders keep their own copy. */
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  const items = await col.of(tenant.id, "menuItems").where("categoryId", "==", id).limit(1).get();
-  if (!items.empty) return { error: "Move or delete the items in this category first." };
-  await col.of(tenant.id, "categories").doc(id).delete();
+  const items = await col.of(tenant.id, "menuItems").where("categoryId", "==", id).get();
+  const batch = fs().batch();
+  items.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(col.of(tenant.id, "categories").doc(id));
+  await batch.commit();
+  await deleteImages(items.docs.map((d) => d.get("imagePath") as string | null));
   revalidatePath("/app/menu");
   return { ok: true };
 }
 
-export async function saveMenuItem(_: ActionResult, f: FormData): Promise<ActionResult> {
+const itemSchema = z.object({
+  id: z.string().max(36).optional(),
+  name: z.string().trim().min(1, "Give the item a name.").max(120),
+  price: z.string(),
+  categoryId: z.string().min(1, "Pick a category.").max(36),
+  description: z.string().max(255).optional(),
+  available: z.boolean(),
+  groups: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, "Every add-on group needs a name.").max(80),
+        required: z.boolean(),
+        maxSelect: z.number().int().min(1).max(20),
+        options: z
+          .array(z.object({ name: z.string().trim().min(1, "Every option needs a name.").max(80), price: z.string() }))
+          .min(1, "Each add-on group needs at least one option.")
+          .max(30),
+      }),
+    )
+    .max(10),
+});
+export type ItemInput = z.infer<typeof itemSchema>;
+
+/**
+ * Creates or updates a menu item with its add-on groups in one go. The form sends the item as
+ * JSON in "data", plus an optional "photo" file (already shrunk in the browser) or "removePhoto".
+ */
+export async function saveItem(f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
   try {
-    const name = str(f, "name");
-    if (!name) return { error: "Enter the item name." };
-    const categoryId = str(f, "categoryId");
-    const cat = categoryId ? await col.of(tenant.id, "categories").doc(categoryId).get() : null;
-    if (!cat?.exists) return { error: "Pick a category." };
-    const imageUrl = str(f, "imageUrl");
-    if (imageUrl && !/^https:\/\//.test(imageUrl)) return { error: "Image link must start with https://" };
-    const values = {
-      name,
-      categoryId,
-      price: sen(f, "price", "price", false),
-      description: str(f, "description").slice(0, 255) || null,
-      imageUrl: imageUrl || null,
-      available: bool(f, "available"),
-    };
-    const id = str(f, "id");
+    const d = itemSchema.parse(JSON.parse(String(f.get("data") ?? "{}")));
+    const price = toSen(d.price);
+    if (!Number.isFinite(price) || price <= 0) return { error: "Enter a price, e.g. 8.50." };
+    if (!(await col.of(tenant.id, "categories").doc(d.categoryId).get()).exists) return { error: "Pick a category." };
     const items = col.of(tenant.id, "menuItems");
-    if (id) {
-      if (!(await items.doc(id).get()).exists) return { error: "Item not found." };
-      await items.doc(id).update(values);
-      revalidatePath("/app/menu");
-      return { ok: true, message: "Saved." };
+    const id = d.id || uid();
+    const existing = d.id ? read<MenuItem>(await items.doc(d.id).get()) : undefined;
+    if (d.id && !existing) return { error: "Item not found." };
+
+    const groups: ModifierGroup[] = d.groups.map((g, gi) => {
+      const groupId = uid();
+      return {
+        id: groupId,
+        menuItemId: id,
+        name: g.name,
+        required: g.required,
+        maxSelect: Math.min(g.maxSelect, g.options.length),
+        sort: gi,
+        options: g.options.map((o, oi) => {
+          const p = o.price.trim() ? toSen(o.price) : 0;
+          if (!Number.isFinite(p) || p < 0) throw new OrderError(`Check the extra price for ${o.name}.`);
+          return { id: uid(), groupId, name: o.name, price: p, sort: oi };
+        }),
+      };
+    });
+
+    let image = { imageUrl: existing?.imageUrl ?? null, imagePath: existing?.imagePath ?? null };
+    const photo = f.get("photo");
+    if (photo instanceof File && photo.size > 0) {
+      const up = await putImage(tenant.id, "items", photo);
+      image = { imageUrl: up.url, imagePath: up.path };
+    } else if (f.get("removePhoto") === "1") image = { imageUrl: null, imagePath: null };
+
+    const values = {
+      name: d.name,
+      price,
+      categoryId: d.categoryId,
+      description: d.description?.trim() || null,
+      available: d.available,
+      groups,
+      ...image,
+    };
+    if (existing) {
+      // Keep the item's place unless it moved to another category.
+      const sort = existing.categoryId === d.categoryId ? existing.sort : Date.now();
+      await items.doc(id).update({ ...values, sort });
+      if (existing.imagePath && existing.imagePath !== image.imagePath) await deleteImage(existing.imagePath);
+    } else {
+      const item: Omit<MenuItem, "id"> = { tenantId: tenant.id, ...values, sort: Date.now() };
+      await items.doc(id).create(item);
     }
-    const newId = uid();
-    const item: Omit<MenuItem, "id"> = { tenantId: tenant.id, ...values, sort: 999, groups: [] };
-    await items.doc(newId).create(item);
     revalidatePath("/app/menu");
-    redirect(`/app/menu/${newId}`);
+    return { ok: true, id, message: existing ? `${d.name} saved` : `${d.name} added to the menu` };
   } catch (e) {
     return fail(e);
   }
@@ -286,56 +345,13 @@ export async function toggleAvailable(id: string, available: boolean): Promise<A
 
 export async function deleteMenuItem(id: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  await col.of(tenant.id, "menuItems").doc(id).delete();
+  const ref = col.of(tenant.id, "menuItems").doc(id);
+  const item = read<MenuItem>(await ref.get());
+  if (!item) return { error: "Item not found." };
+  await ref.delete();
+  await deleteImage(item.imagePath);
   revalidatePath("/app/menu");
-  redirect("/app/menu");
-}
-
-/** Replaces all add-on groups for an item in one go (the editor sends the full structure). */
-const groupsSchema = z
-  .array(
-    z.object({
-      name: z.string().trim().min(1, "Every add-on group needs a name").max(80),
-      required: z.boolean(),
-      maxSelect: z.number().int().min(1).max(20),
-      options: z
-        .array(z.object({ name: z.string().trim().min(1, "Every option needs a name").max(80), price: z.string() }))
-        .min(1, "Each add-on group needs at least one option")
-        .max(30),
-    }),
-  )
-  .max(10);
-
-export async function saveModifiers(menuItemId: string, raw: unknown): Promise<ActionResult> {
-  const { tenant } = await requireUser(["owner"]);
-  try {
-    const groups = groupsSchema.parse(raw);
-    const itemRef = col.of(tenant.id, "menuItems").doc(menuItemId);
-    const item = read<MenuItem>(await itemRef.get());
-    if (!item) return { error: "Item not found." };
-    for (const g of groups)
-      for (const o of g.options) {
-        const p = toSen(o.price || "0");
-        if (!Number.isFinite(p) || p < 0) return { error: `Check the price for ${o.name}.` };
-      }
-    const next: ModifierGroup[] = groups.map((g, gi) => {
-      const groupId = uid();
-      return {
-        id: groupId,
-        menuItemId: item.id,
-        name: g.name,
-        required: g.required,
-        maxSelect: g.maxSelect,
-        sort: gi,
-        options: g.options.map((o, oi) => ({ id: uid(), groupId, name: o.name, price: toSen(o.price || "0"), sort: oi })),
-      };
-    });
-    await itemRef.update({ groups: next });
-    revalidatePath(`/app/menu/${item.id}`);
-    return { ok: true, message: "Add-ons saved." };
-  } catch (e) {
-    return fail(e);
-  }
+  return { ok: true, message: `${item.name} deleted` };
 }
 
 /* --------------------------------- Tables --------------------------------- */
@@ -404,8 +420,8 @@ export async function settleCredit(_: ActionResult, f: FormData): Promise<Action
   try {
     await assertOpenToday(tenant.id);
     const customerId = str(f, "customerId");
-    const method = str(f, "method") as "cash" | "duitnow_qr" | "online";
-    if (!["cash", "duitnow_qr", "online"].includes(method)) return { error: "Pick how they paid." };
+    const method = str(f, "method") as "cash" | "duitnow_qr";
+    if (!["cash", "duitnow_qr"].includes(method)) return { error: "Pick how they paid." };
     const amount = sen(f, "amount", "amount", false);
     const c = customerId ? await getCustomer(tenant.id, customerId) : undefined;
     if (!c || c.type !== "corporate") return { error: "Corporate customer not found." };
@@ -423,7 +439,6 @@ export async function settleCredit(_: ActionResult, f: FormData): Promise<Action
       tendered: null,
       changeGiven: null,
       reference: str(f, "reference").slice(0, 120) || null,
-      gatewayBillCode: null,
       receivedBy: user.id,
       createdAt: now,
       confirmedAt: now,
@@ -510,40 +525,49 @@ export async function setStaffActive(id: string, active: boolean): Promise<Actio
 export async function saveSettings(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
   try {
-    const name = str(f, "name");
-    if (!name) return { error: "Enter the kedai name." };
     const set: Partial<Tenant> = {
-      name,
-      address: str(f, "address").slice(0, 255) || null,
-      phone: str(f, "phone").slice(0, 32) || null,
       email: str(f, "email").slice(0, 160) || null,
-      receiptFooter: str(f, "receiptFooter").slice(0, 255) || null,
       sstRate: rate(f, "sstRate", "SST"),
       serviceChargeRate: rate(f, "serviceChargeRate", "Service charge"),
       memberDiscountRate: rate(f, "memberDiscountRate", "Member discount"),
       staffDiscountRate: rate(f, "staffDiscountRate", "Staff discount"),
-      allowQrCounterPay: bool(f, "allowQrCounterPay"),
-      toyyibpaySandbox: bool(f, "toyyibpaySandbox"),
-      toyyibpayCategory: str(f, "toyyibpayCategory").slice(0, 64) || null,
     };
-    const secret = str(f, "toyyibpaySecret");
-    if (secret) set.toyyibpaySecret = secret.slice(0, 128);
-    if (bool(f, "clearToyyibpay")) {
-      set.toyyibpaySecret = null;
-      set.toyyibpayCategory = null;
-    }
-
-    const qr = f.get("duitnowQr");
-    if (qr instanceof File && qr.size > 0) {
-      if (qr.size > 400_000) return { error: "QR image is too big. Use a screenshot under 400 KB." };
-      if (!/^image\/(png|jpeg|webp)$/.test(qr.type)) return { error: "QR image must be PNG, JPG or WebP." };
-      set.duitnowQrUrl = `data:${qr.type};base64,${Buffer.from(await qr.arrayBuffer()).toString("base64")}`;
-    }
-    if (bool(f, "removeQr")) set.duitnowQrUrl = null;
-
     await col.tenants().doc(tenant.id).update(set);
     revalidatePath("/app", "layout");
     return { ok: true, message: "Settings saved." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Brand & profile: what customers see on the QR menu, order page and receipt. */
+export async function saveBrand(_: ActionResult, f: FormData): Promise<ActionResult> {
+  const { tenant } = await requireUser(["owner"]);
+  try {
+    const name = str(f, "name").slice(0, 60);
+    if (!name) return { error: "Enter the kedai name." };
+    const color = str(f, "brandColor").toLowerCase();
+    const set: Partial<Tenant> = {
+      name,
+      tagline: str(f, "tagline").slice(0, 80) || null,
+      address: str(f, "address").slice(0, 160) || null,
+      phone: str(f, "phone").slice(0, 32) || null,
+      receiptFooter: str(f, "receiptFooter").slice(0, 120) || null,
+      brandColor: /^#[0-9a-f]{6}$/.test(color) ? color : DEFAULT_BRAND_COLOR,
+    };
+    const logo = f.get("logo");
+    if (logo instanceof File && logo.size > 0) {
+      const up = await putImage(tenant.id, "logo", logo);
+      set.logoUrl = up.url;
+      set.logoPath = up.path;
+    } else if (bool(f, "removeLogo")) {
+      set.logoUrl = null;
+      set.logoPath = null;
+    }
+    await col.tenants().doc(tenant.id).update(set);
+    if (set.logoPath !== undefined && tenant.logoPath && tenant.logoPath !== set.logoPath) await deleteImage(tenant.logoPath);
+    revalidatePath("/app", "layout");
+    return { ok: true, message: "Saved. Customers see it straight away." };
   } catch (e) {
     return fail(e);
   }
@@ -559,7 +583,7 @@ export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResu
     if (date > myDate()) return { error: "You can't close a future date." };
     const s = await reconSummary(tenant.id, date);
     if (s.openOrders > 0)
-      return { error: `${s.openOrders} order(s) on ${date} are still unpaid or awaiting confirmation. Settle or cancel them first.` };
+      return { error: `${s.openOrders} order(s) on ${date} are still unpaid. Settle or cancel them first.` };
     const openingFloat = sen(f, "openingFloat", "opening float");
     const rec: Omit<Reconciliation, "id"> = {
       tenantId: tenant.id,
@@ -569,8 +593,6 @@ export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResu
       countedCash: sen(f, "countedCash", "cash counted"),
       expectedQr: s.byMethod.duitnow_qr + s.settlements.duitnow_qr,
       bankQr: sen(f, "bankQr", "QR in bank"),
-      expectedOnline: s.byMethod.online,
-      gatewayOnline: sen(f, "gatewayOnline", "online in gateway"),
       creditSales: s.byMethod.credit,
       notes: str(f, "notes").slice(0, 500) || null,
       closedBy: user.id,

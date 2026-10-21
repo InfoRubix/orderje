@@ -37,7 +37,13 @@ export default async function TablePage({ params }: { params: Promise<{ slug: st
       slug={slug}
       table={table}
       tableLabel={tableLabel}
-      shop={{ name: tenant.name, address: tenant.address }}
+      shop={{
+        name: tenant.name,
+        tagline: tenant.tagline,
+        address: tenant.address,
+        logoUrl: tenant.logoUrl,
+        brandColor: tenant.brandColor,
+      }}
       menu={menu}
       rates={{
         sstRate: tenant.sstRate,

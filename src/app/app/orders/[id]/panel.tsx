@@ -15,7 +15,6 @@ export function PaymentPanel({
   customers,
   owing,
   labels,
-  qrConfigured,
 }: {
   order: {
     id: string;
@@ -34,7 +33,6 @@ export function PaymentPanel({
   customers: Cust[];
   owing: number;
   labels: Record<CustomerType, string>;
-  qrConfigured: boolean;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -47,7 +45,7 @@ export function PaymentPanel({
   const [done, setDone] = useState<{ change: number | null } | null>(null);
 
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
-  const locked = settled || order.status === "cancelled" || order.paymentStatus === "pending";
+  const locked = settled || order.status === "cancelled";
   const customerChanged = type !== order.customerType || (type !== "walk_in" && custId !== (order.customerId ?? ""));
   const cashDue = cashRound(order.total);
   const tSen = Math.round(Number(tendered || 0) * 100);
@@ -85,8 +83,8 @@ export function PaymentPanel({
           {order.paymentStatus === "credit" ? "Charged to company account" : "Paid"}
         </p>
         {done?.change ? (
-          <div className="rounded-xl bg-ink p-4 text-white">
-            <p className="text-sm text-white/70">Give change</p>
+          <div className="rounded-xl bg-ink p-4 text-on-ink">
+            <p className="text-sm opacity-70">Give change</p>
             <p className="num font-display text-4xl font-bold">{rm(done.change)}</p>
           </div>
         ) : null}
@@ -164,11 +162,7 @@ export function PaymentPanel({
 
       <Totals order={order} />
 
-      {order.paymentStatus === "pending" ? (
-        <p className="rounded-lg bg-teh-soft p-3 text-sm font-semibold text-teh">
-          The customer has a payment waiting for confirmation. Confirm or reject it on the Counter page first.
-        </p>
-      ) : order.status === "cancelled" ? (
+      {order.status === "cancelled" ? (
         <p className="rounded-lg bg-chili-soft p-3 text-sm font-semibold text-chili">This order was cancelled.</p>
       ) : customerChanged ? null : (
         <section className="space-y-3">
@@ -229,9 +223,7 @@ export function PaymentPanel({
           {method === "duitnow_qr" ? (
             <div className="space-y-2">
               <p className="text-sm text-ink-soft">
-                {qrConfigured
-                  ? "Customer scans the DuitNow QR at the counter. Check your bank app, then enter the reference."
-                  : "Upload your DuitNow QR in Settings so customers can also scan it from their order page."}
+                Customer scans your DuitNow QR at the counter. Check your bank app, then enter the reference.
               </p>
               <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank reference (last 4–6 digits)" />
             </div>

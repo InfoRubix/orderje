@@ -15,7 +15,9 @@
  *   slugs/{slug}          -> { tenantId }
  *   emails/{email}        -> { userId }
  *   orderTokens/{token}   -> { tenantId, orderId }
- *   bills/{billCode}      -> { tenantId, paymentId }
+ *
+ * Logos and menu photos live in Cloud Storage under tenants/{tenantId}/; documents keep the
+ * public download URL plus the storage path (so the file can be deleted when replaced).
  *
  * Every query is a single-field filter, so no composite indexes are needed.
  */
@@ -25,25 +27,29 @@ export type OrderType = "dine_in" | "takeaway" | "delivery";
 export type CustomerType = "walk_in" | "member" | "staff" | "corporate";
 export type RegisteredCustomerType = Exclude<CustomerType, "walk_in">;
 export type OrderStatus = "new" | "preparing" | "ready" | "served" | "cancelled";
-export type PaymentStatus = "unpaid" | "pending" | "paid" | "credit";
-export type PaymentMethod = "cash" | "duitnow_qr" | "online" | "credit";
+/** Customers pay at the counter, so a bill is either unpaid or settled (paid, or put on company credit). */
+export type PaymentStatus = "unpaid" | "paid" | "credit";
+export type PaymentMethod = "cash" | "duitnow_qr" | "credit";
+
+export const DEFAULT_BRAND_COLOR = "#1f7a4d";
 
 export type Tenant = {
   id: string;
   slug: string;
   name: string;
+  /** Short line under the name on the customer menu, e.g. "Mamak 24 jam sejak 1998". */
+  tagline: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
+  logoUrl: string | null;
+  logoPath: string | null;
+  /** #rrggbb, used for the customer menu header, buttons and prices. */
+  brandColor: string;
   sstRate: number;
   serviceChargeRate: number;
   memberDiscountRate: number;
   staffDiscountRate: number;
-  duitnowQrUrl: string | null;
-  toyyibpaySecret: string | null;
-  toyyibpayCategory: string | null;
-  toyyibpaySandbox: boolean;
-  allowQrCounterPay: boolean;
   receiptFooter: string | null;
   orderSeq: number;
   active: boolean;
@@ -84,6 +90,7 @@ export type MenuItem = {
   description: string | null;
   price: number;
   imageUrl: string | null;
+  imagePath: string | null;
   available: boolean;
   sort: number;
   groups: ModifierGroup[];
@@ -137,6 +144,8 @@ export type Order = {
   customerPhone: string | null;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  /** How the bill was settled, for the counter's "Just paid" list. */
+  paidMethod?: PaymentMethod | null;
   subtotal: number;
   discount: number;
   serviceCharge: number;
@@ -156,12 +165,12 @@ export type Payment = {
   customerId: string | null;
   kind: "order" | "settlement";
   method: PaymentMethod;
-  status: "pending" | "success" | "failed";
+  /** "failed" marks a voided payment. */
+  status: "success" | "failed";
   amount: number;
   tendered: number | null;
   changeGiven: number | null;
   reference: string | null;
-  gatewayBillCode: string | null;
   receivedBy: string | null;
   createdAt: Date;
   confirmedAt: Date | null;
@@ -177,8 +186,6 @@ export type Reconciliation = {
   countedCash: number;
   expectedQr: number;
   bankQr: number;
-  expectedOnline: number;
-  gatewayOnline: number;
   creditSales: number;
   notes: string | null;
   closedBy: string;

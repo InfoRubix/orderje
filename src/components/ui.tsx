@@ -7,12 +7,12 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-pandan text-white hover:bg-pandan-dark",
+        primary: "bg-pandan text-on-brand hover:brightness-95",
         secondary: "bg-surface text-ink border border-line hover:bg-paper",
         ghost: "text-ink-soft hover:bg-line/60 hover:text-ink",
         danger: "bg-chili text-white hover:brightness-95",
         amber: "bg-teh text-white hover:brightness-95",
-        dark: "bg-ink text-white hover:bg-ink-soft",
+        dark: "bg-ink text-on-ink hover:bg-ink-soft",
       },
       size: {
         sm: "h-8 px-3 text-sm",
@@ -78,7 +78,7 @@ const badgeTone = {
   green: "bg-pandan-soft text-pandan-dark",
   amber: "bg-teh-soft text-teh",
   red: "bg-chili-soft text-chili",
-  dark: "bg-ink text-white",
+  dark: "bg-ink text-on-ink",
 } as const;
 
 export function Badge({
