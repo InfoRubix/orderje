@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { col, fs, isAlreadyExists, read } from "@/db";
 import {
@@ -41,10 +42,13 @@ async function assertOpenToday(tenantId: string) {
   if (await isDayClosed(tenantId, myDate())) throw new OrderError("Today is already closed in Recon. Ask the owner to reopen it before taking more payments.");
 }
 
+/** Turns any failure into a message the screen can show, so nothing ever fails silently. */
 function fail(e: unknown): ActionResult {
   if (e instanceof OrderError) return { error: e.message };
   if (e instanceof z.ZodError) return { error: e.issues[0]?.message ?? "Check the form." };
-  throw e;
+  unstable_rethrow(e); // let Next.js redirects and not-found through
+  console.error(e);
+  return { error: "Something went wrong and nothing was saved. Please try again." };
 }
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();

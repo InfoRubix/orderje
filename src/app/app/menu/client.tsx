@@ -341,9 +341,14 @@ function ItemEditor({
     if (photo) f.set("photo", photo);
     if (removePhoto) f.set("removePhoto", "1");
     start(async () => {
-      const r = await saveItem(f);
-      if (r?.error) setErr(r.error);
-      else onDone(r?.message ?? "Saved");
+      setErr(undefined);
+      try {
+        const r = await saveItem(f);
+        if (r?.error) setErr(r.error);
+        else onDone(r?.message ?? "Saved");
+      } catch {
+        setErr("Couldn't reach the server. Check your connection and try again.");
+      }
     });
   }
 
