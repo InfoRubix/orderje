@@ -37,9 +37,9 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 
 ## Stack
 
-Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Cloud Firestore + Cloud Storage for Firebase (Admin SDK) · Vercel · JWT session cookies (jose) · bcrypt.
+Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Cloud Firestore (Firebase Admin SDK) · Vercel · JWT session cookies (jose) · bcrypt.
 
-All data access happens on the server through the Admin SDK; `firestore.rules` and `storage.rules` deny every direct client read and write. Logos and menu photos are stored in Cloud Storage and shown through Firebase download-token URLs. Money is stored as integer sen; rates as basis points. Timestamps are Firestore timestamps (UTC); business dates are Malaysia time. The data model is documented at the top of `src/db/schema.ts`. Every query filters on a single field, so no composite indexes are needed.
+All data access happens on the server through the Admin SDK; `firestore.rules` denies every direct client read and write. Logos and menu photos are shrunk in the browser and stored in Firestore (`images/{id}`, under the 1 MiB document limit), then served by `/img/{id}` with a year-long cache so the CDN answers repeat views. Money is stored as integer sen; rates as basis points. Timestamps are Firestore timestamps (UTC); business dates are Malaysia time. The data model is documented at the top of `src/db/schema.ts`. Every query filters on a single field, so no composite indexes are needed.
 
 ## Run locally
 
@@ -48,7 +48,7 @@ Needs Node 20+, Java 11+ (for the Firestore emulator) and the Firebase CLI (`npm
 ```bash
 cp .env.example .env.local        # points at the emulator; set AUTH_SECRET
 npm install
-npm run emulators                 # terminal 1: Firestore :8080 + Storage :9199 (data is lost when they stop)
+npm run emulators                 # terminal 1: Firestore emulator on :8080 (data is lost when it stops)
 npm run dev                       # terminal 2: http://localhost:3000
 ```
 
@@ -63,18 +63,15 @@ Sign up at `/signup` (tick "Start with a sample mamak menu" for demo data). The 
 | `SUPERADMIN_EMAILS` | Comma-separated Rubix emails allowed into `/admin` |
 | `ALLOW_SIGNUP` | `false` to close public signup and onboard kedai manually |
 | `FIRESTORE_EMULATOR_HOST` | Local only: `127.0.0.1:8080` to use the emulator |
-| `FIREBASE_STORAGE_EMULATOR_HOST` | Local only: `127.0.0.1:9199` |
-| `FIREBASE_STORAGE_BUCKET` | Only if the bucket isn't the default `<project-id>.firebasestorage.app` |
 | `FIREBASE_PROJECT_ID` | Firebase project ID (`demo-orderje` for the emulator) |
 | `FIREBASE_SERVICE_ACCOUNT` | Service-account JSON (raw or base64) for the real project. Required on Vercel |
 
 ## Deploy: Vercel + Firestore
 
 **Firestore (Firebase console)**
-1. Create a **Cloud Firestore** database in the project: location `asia-southeast1` (Singapore), production mode.
-2. Upgrade the project to the **Blaze** plan (needed for Cloud Storage on new projects; small kedai stay inside the free quota), then **Storage → Get started**, location `asia-southeast1`.
-3. Publish the rules: paste `firestore.rules` into Firestore → Rules and `storage.rules` into Storage → Rules (or run `npm run deploy:rules`). They block all browser access; the app only talks to Firebase from the server.
-4. Project settings → **Service accounts** → *Generate new private key*. This JSON file is the app's database password: never commit it.
+1. Create a **Cloud Firestore** database in the project: location `asia-southeast1` (Singapore), production mode. The free Spark plan is enough to start.
+2. **Rules** tab: paste `firestore.rules` and publish (or `npm run deploy:rules`). It blocks all browser access; the app only talks to Firestore from the server.
+3. Project settings → **Service accounts** → *Generate new private key*. This JSON file is the app's database password: never commit it.
 
 **Vercel**
 1. Import the GitHub repo as a Next.js project. `vercel.json` pins the functions to `sin1` (Singapore), next to the database; without it every query would cross the Pacific.

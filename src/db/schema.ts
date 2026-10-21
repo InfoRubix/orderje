@@ -16,8 +16,10 @@
  *   emails/{email}        -> { userId }
  *   orderTokens/{token}   -> { tenantId, orderId }
  *
- * Logos and menu photos live in Cloud Storage under tenants/{tenantId}/; documents keep the
- * public download URL plus the storage path (so the file can be deleted when replaced).
+ *   images/{id}           -> { tenantId, contentType, data } logos and menu photos, served by /img/{id}
+ *
+ * Tenants and menu items keep the image URL (/img/{id}) plus its id in logoPath / imagePath,
+ * so the old image can be deleted when it's replaced.
  *
  * Every query is a single-field filter, so no composite indexes are needed.
  */

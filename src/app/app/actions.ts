@@ -28,7 +28,7 @@ import {
   setOrderCustomer,
 } from "@/lib/orders";
 import { getCustomer, getUserByEmail, isDayClosed, listCategories, listTables } from "@/lib/repo";
-import { deleteImage, deleteImages, putImage } from "@/lib/storage";
+import { deleteImage, deleteImages, putImage } from "@/lib/images";
 import { reconSummary } from "@/lib/reports";
 import { seedTables } from "@/lib/seed-menu";
 import { toSen } from "@/lib/money";
@@ -305,7 +305,7 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
     let image = { imageUrl: existing?.imageUrl ?? null, imagePath: existing?.imagePath ?? null };
     const photo = f.get("photo");
     if (photo instanceof File && photo.size > 0) {
-      const up = await putImage(tenant.id, "items", photo);
+      const up = await putImage(tenant.id, photo);
       image = { imageUrl: up.url, imagePath: up.path };
     } else if (f.get("removePhoto") === "1") image = { imageUrl: null, imagePath: null };
 
@@ -557,7 +557,7 @@ export async function saveBrand(_: ActionResult, f: FormData): Promise<ActionRes
     };
     const logo = f.get("logo");
     if (logo instanceof File && logo.size > 0) {
-      const up = await putImage(tenant.id, "logo", logo);
+      const up = await putImage(tenant.id, logo);
       set.logoUrl = up.url;
       set.logoPath = up.path;
     } else if (bool(f, "removeLogo")) {

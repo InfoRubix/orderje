@@ -30,8 +30,6 @@ function appOptions(): AppOptions {
       opts = { credential: cert(json), projectId };
     } else opts = { credential: applicationDefault(), projectId };
   }
-  // Default bucket of projects created since late 2024; older projects use <id>.appspot.com.
-  opts.storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
   return opts;
 }
 
@@ -59,6 +57,8 @@ export const col = {
   slugs: () => fs().collection("slugs"),
   emails: () => fs().collection("emails"),
   orderTokens: () => fs().collection("orderTokens"),
+  /** Logos and menu photos (bytes), served by /img/{id}. */
+  images: () => fs().collection("images"),
   /** A collection that belongs to one kedai, e.g. tenants/{id}/orders. */
   of: (tenantId: string, name: TenantSub) => fs().collection("tenants").doc(tenantId).collection(name),
 };

@@ -5,7 +5,7 @@ counter payments (DuitNow QR, cash, credit) -> dashboard -> recon -> tenant isol
 Runs against the Firestore emulator and WIPES it first. It refuses to run without one.
 
     pip install playwright && playwright install chromium
-    npm run emulators                     # terminal 1 (Firestore + Storage)
+    npm run emulators                     # terminal 1
     npm run build && npm start            # terminal 2 (.env.local points at the emulator)
     python3 tests/e2e.py
 """
@@ -84,7 +84,9 @@ with sync_playwright() as p:
     expect(page.get_by_text("Saved. Customers see it straight away.")).to_be_visible()
     t = one("tenants")
     assert (t["brandColor"], t["tagline"]) == ("#c23a2f", "Mamak 24 jam sejak 1998"), t
-    assert urllib.request.urlopen(t["logoUrl"]).status == 200, t["logoUrl"]
+    logo = urllib.request.urlopen(BASE + t["logoUrl"])
+    assert logo.status == 200 and logo.headers["Content-Type"] == "image/png", t["logoUrl"]
+    assert len(docs("images", tenantId=t["_id"])) == 1
 
     step("settings: SST 6%, service 10%")
     page.goto(f"{BASE}/app/settings")
@@ -123,7 +125,7 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Save changes").click()
     expect(page.get_by_text("Nasi Lemak Biasa saved")).to_be_visible()
     nl = one("menuItems", name="Nasi Lemak Biasa")
-    assert nl["imagePath"] and urllib.request.urlopen(nl["imageUrl"]).status == 200, nl
+    assert nl["imagePath"] and urllib.request.urlopen(BASE + nl["imageUrl"]).status == 200, nl
     assert len(nl["groups"]) == 1 and nl["groups"][0]["name"] == "Lauk tambah", nl["groups"]
     page.get_by_role("button", name="+ Add item to Minuman").click()
     page.get_by_placeholder("e.g. Nasi Ayam Penyet").fill("Air Kosong")

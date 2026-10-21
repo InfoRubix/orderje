@@ -13,6 +13,8 @@ const db = getFirestore();
 const plain = (v) =>
   v instanceof Timestamp
     ? v.toDate().toISOString()
+    : v instanceof Uint8Array
+      ? `<${v.length} bytes>`
     : Array.isArray(v)
       ? v.map(plain)
       : v && typeof v === "object"
