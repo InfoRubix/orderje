@@ -11,7 +11,7 @@ export const buttonVariants = cva(
         secondary: "bg-surface text-ink border-2 border-edge hover:bg-paper",
         ghost: "text-ink-soft hover:bg-line/60 hover:text-ink",
         danger: "bg-chili text-white hover:brightness-95",
-        amber: "bg-tag text-[#141414] hover:brightness-95",
+        amber: "bg-teh text-white hover:brightness-95",
         dark: "bg-ink text-on-ink hover:bg-ink-soft",
       },
       size: {
@@ -76,7 +76,7 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 const badgeTone = {
   neutral: "bg-line/70 text-ink-soft",
   green: "bg-pandan-soft text-pandan-dark",
-  amber: "bg-tag text-[#141414]",
+  amber: "bg-teh-soft text-teh",
   red: "bg-chili-soft text-chili",
   dark: "bg-ink text-on-ink",
 } as const;

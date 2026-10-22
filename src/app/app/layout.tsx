@@ -3,14 +3,15 @@ import { LogOut } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { logout } from "@/app/(auth)/actions";
 import { Nav } from "@/components/nav";
+import { Logo } from "@/components/brand";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, tenant } = await requireUser();
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="no-print hidden w-60 shrink-0 flex-col border-r-4 border-tag bg-rail p-4 text-white md:flex md:sticky md:top-0 md:h-dvh">
-        <Link href="/app" className="px-3 pb-1 font-display text-3xl text-tag">
-          OrderJe
+      <aside className="no-print hidden w-60 shrink-0 flex-col border-r-4 border-tag bg-rail p-4 text-cream md:flex md:sticky md:top-0 md:h-dvh">
+        <Link href="/app" className="px-3 pb-2" aria-label="OrderTerus">
+          <Logo tone="cream" className="w-40" />
         </Link>
         <p className="truncate px-3 pb-5 text-sm text-white/60">{tenant.name}</p>
         <Nav role={user.role} variant="rail" />
@@ -24,9 +25,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <header className="no-print flex items-center justify-between border-b-4 border-tag bg-rail px-4 py-3 text-white md:hidden">
+      <header className="no-print flex items-center justify-between border-b-4 border-tag bg-rail px-4 py-3 text-cream md:hidden">
         <div>
-          <p className="font-display text-2xl leading-none text-tag">OrderJe</p>
+          <Logo tone="cream" className="w-32" />
           <p className="text-xs text-white/60">{tenant.name}</p>
         </div>
         <form action={logout}>

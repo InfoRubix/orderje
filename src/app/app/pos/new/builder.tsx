@@ -79,7 +79,7 @@ export function CounterOrder({
               key={c.id}
               onClick={() => setCat(c.id)}
               className={cn(
-                "shrink-0 rounded-sm border-2 px-3 py-2 text-xs font-bold uppercase tracking-wider",
+                "shrink-0 rounded-full border-2 px-4 py-2 text-sm font-semibold",
                 cat === c.id ? "border-edge bg-cta text-on-cta" : "border-line bg-surface text-ink-soft",
               )}
             >

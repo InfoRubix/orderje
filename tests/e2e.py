@@ -1,5 +1,5 @@
 """
-End-to-end test of OrderJe: signup -> brand & menu photos -> QR order -> kitchen ->
+End-to-end test of OrderTerus: signup -> brand & menu photos -> QR order -> kitchen ->
 counter payments (DuitNow QR, cash, credit) -> dashboard -> recon -> tenant isolation.
 
 Runs against the Firestore emulator and WIPES it first. It refuses to run without one.

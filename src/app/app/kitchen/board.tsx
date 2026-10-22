@@ -127,7 +127,7 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
               <section key={col.status} aria-label={col.title}>
                 <h2 className="mb-3 flex items-center gap-2 font-display text-xl">
                   {col.title}
-                  <span className="num rounded-md bg-tag px-2 text-sm text-[#141414]">{list.length}</span>
+                  <span className="num rounded-md bg-tag px-2 text-sm text-on-tag">{list.length}</span>
                 </h2>
                 <div className="space-y-5">
                   {list.length === 0 ? (

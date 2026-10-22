@@ -89,19 +89,19 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {open?.n ? (
         <Link
           href="/app/pos"
-          className="mb-5 flex items-center justify-between rounded-xl border-2 border-edge bg-tag px-4 py-3 text-sm font-bold text-[#141414]"
+          className="mb-5 flex items-center justify-between rounded-xl border-2 border-edge bg-tag px-4 py-3 text-sm font-bold text-on-tag"
         >
           <span>
-            {open.n} bill{open.n === 1 ? "" : "s"} still unpaid or waiting for confirmation
+            {open.n} bill{open.n === 1 ? "" : "s"} still unpaid
           </span>
           <span className="underline">Open counter</span>
         </Link>
       ) : null}
 
       <div className="mb-6 grid gap-0.5 overflow-hidden rounded-xl border-2 border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-[#141414] p-5 text-white">
+        <div className="bg-[#24211d] p-5 text-white">
           <p className="text-xs font-bold uppercase tracking-wider text-white/70">Sales</p>
-          <p className="num font-display text-5xl text-tag">{rm(r.sales)}</p>
+          <p className="num font-display text-5xl text-cream">{rm(r.sales)}</p>
           <p className="mt-1 text-sm text-white/70">
             {r.orders} paid order{r.orders === 1 ? "" : "s"}
           </p>

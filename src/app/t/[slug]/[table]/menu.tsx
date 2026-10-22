@@ -92,7 +92,7 @@ export function CustomerMenu({
 
   return (
     <div className="brand mx-auto min-h-dvh max-w-xl bg-paper pb-28" style={brandStyle(shop.brandColor)}>
-      <header className="border-b-[6px] border-tag bg-pandan px-5 pb-5 pt-6 text-on-brand">
+      <header className="border-b-4 border-edge bg-pandan px-5 pb-5 pt-6 text-on-brand">
         <p className="text-sm opacity-80">{tableLabel ? `You're at ${tableLabel}` : "Takeaway order"}</p>
         <div className="mt-1.5 flex items-center gap-3">
           <ShopLogo name={shop.name} src={shop.logoUrl} className="size-14" />
@@ -108,7 +108,7 @@ export function CustomerMenu({
             key={c.id}
             href={`#cat-${c.id}`}
             className={cn(
-              "shrink-0 rounded-sm border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider",
+              "shrink-0 rounded-full border-2 px-3.5 py-1.5 text-sm font-semibold",
               activeCat === c.id ? "border-edge bg-cta text-on-cta" : "border-line bg-surface text-ink-soft",
             )}
           >

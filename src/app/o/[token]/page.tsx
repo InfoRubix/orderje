@@ -34,7 +34,7 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
   return (
     <main className="brand mx-auto min-h-dvh max-w-xl pb-10" style={brandStyle(tenant.brandColor)}>
       <AutoRefresh every={5000} enabled={!done} />
-      <header className="border-b-[6px] border-tag bg-pandan px-5 pb-6 pt-6 text-on-brand">
+      <header className="border-b-4 border-edge bg-pandan px-5 pb-6 pt-6 text-on-brand">
         <p className="flex items-center gap-2 text-sm opacity-80">
           <ShopLogo name={tenant.name} src={tenant.logoUrl} className="size-7 rounded-md text-sm" />
           {tenant.name}

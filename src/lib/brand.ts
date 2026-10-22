@@ -3,7 +3,8 @@ import { DEFAULT_BRAND_COLOR } from "@/db/schema";
 
 /** Preset brand colours offered in Brand & profile. */
 export const BRAND_PRESETS: [name: string, hex: string][] = [
-  ["Merah papan", "#c22a1e"],
+  ["Merah cili", "#d92d20"],
+  ["Hijau kedai", "#28584a"],
   ["Pandan", "#1f7a4d"],
   ["Teh tarik", "#a8681a"],
   ["Biru laut", "#1f5f9e"],

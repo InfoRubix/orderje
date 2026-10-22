@@ -1,5 +1,5 @@
 """
-Feature-by-feature check of OrderJe. Complements tests/e2e.py (the happy path) with the rules,
+Feature-by-feature check of OrderTerus. Complements tests/e2e.py (the happy path) with the rules,
 limits and error cases of every screen. Each check runs on its own and the run ends with a
 pass/fail list, so one broken feature doesn't hide the others.
 
@@ -134,7 +134,7 @@ with sync_playwright() as p:
         t = one("tenants", name="Kedai Satu")
         state["t1"] = t["_id"]
         state["slug1"] = t["slug"]
-        assert t["slug"] == "kedai-satu" and t["brandColor"] == "#c22a1e", t
+        assert t["slug"] == "kedai-satu" and t["brandColor"] == "#d92d20", t
         assert len(docs("tables", t["_id"])) == 3
         assert len(docs("menuItems", t["_id"])) == 13
 

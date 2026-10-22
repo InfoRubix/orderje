@@ -42,7 +42,7 @@ export default async function AdminPage() {
 
   return (
     <main className="mx-auto max-w-5xl p-6 md:p-10">
-      <PageHeader title="Kedai on OrderJe" sub={`${n} accounts. Suspending a kedai blocks its logins and QR ordering.`} />
+      <PageHeader title="Kedai on OrderTerus" sub={`${n} accounts. Suspending a kedai blocks its logins and QR ordering.`} />
       <div className="overflow-x-auto rounded-xl border-2 border-edge bg-surface">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b border-line text-left text-ink-soft">

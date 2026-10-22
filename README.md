@@ -1,4 +1,4 @@
-# OrderJe
+# OrderTerus
 
 QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tenant SaaS: one deployment, many kedai, each with its own menu, staff, customers and data.
 

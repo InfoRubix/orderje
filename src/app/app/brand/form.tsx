@@ -170,8 +170,8 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
 
       <aside className="space-y-2 lg:sticky lg:top-6">
         <p className="text-sm font-semibold text-ink-soft">Live preview</p>
-        <div className="brand overflow-hidden rounded-[28px] border-[6px] border-[#141414] bg-paper" style={brandStyle(b.brandColor)}>
-          <div className="border-b-[6px] border-tag bg-pandan px-5 pb-5 pt-5 text-on-brand">
+        <div className="brand overflow-hidden rounded-[28px] border-[6px] border-[#24211d] bg-paper" style={brandStyle(b.brandColor)}>
+          <div className="border-b-4 border-edge bg-pandan px-5 pb-5 pt-5 text-on-brand">
             <p className="text-sm opacity-80">You&apos;re at Meja 3</p>
             <div className="mt-1.5 flex items-center gap-3">
               <ShopLogo name={b.name || "?"} src={preview} className="size-12" />

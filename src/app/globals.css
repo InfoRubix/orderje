@@ -1,43 +1,45 @@
 @import "tailwindcss";
 
 /*
-  OrderJe "Papan Tanda": the shopfront signboard. Warm sign-paper, black ink, mustard price tags,
-  signboard red, condensed capitals for headings, near-square corners, 2px black edges on objects.
-  Pandan stays as the "paid / go" colour, teh for waiting, chili for problems.
+  OrderTerus brand: Chilli Red #D92D20, Warm Cream #FFF4DE, Ink #24211D, Kedai Green #28584A.
+  Cream paper, ink text and edges, chilli red for the brand and the main action, kedai green
+  for "paid / done". Headings are heavy, tight sans (the rounded face is reserved for the logo).
   Dark mode follows the device. On customer pages, .brand swaps pandan for the kedai's colour.
 */
 @theme {
-  --color-ink: #141414;
-  --color-ink-soft: #4a4741;
-  --color-mute: #7a766d;
-  --color-paper: #f4f3ef;
-  --color-surface: #ffffff;
-  --color-line: #dedbd3;
-  --color-edge: #141414;
-  --color-tag: #f2b01e;
-  --color-tag-soft: #fcefc9;
-  --color-sign: #c22a1e;
-  --color-cta: #141414;
-  --color-on-cta: #f2b01e;
-  --color-pandan: #1f7a4d;
-  --color-pandan-dark: #155c39;
-  --color-pandan-soft: #e2efe6;
-  --color-teh: #a8681a;
-  --color-teh-soft: #fbf0df;
-  --color-chili: #c22a1e;
-  --color-chili-soft: #fbe6e3;
-  --color-slip: #fffdf7;
-  --color-rail: #141414;
-  --color-on-ink: #ffffff;
+  --color-ink: #24211d;
+  --color-ink-soft: #57514a;
+  --color-mute: #857d72;
+  --color-paper: #fff4de;
+  --color-surface: #fffbf3;
+  --color-line: #ecdfc6;
+  --color-edge: #24211d;
+  --color-tag: #d92d20;
+  --color-on-tag: #fff4de;
+  --color-tag-soft: #fbe2d9;
+  --color-sign: #d92d20;
+  --color-cream: #fff4de;
+  --color-cta: #d92d20;
+  --color-on-cta: #fff4de;
+  --color-pandan: #28584a;
+  --color-pandan-dark: #1f463b;
+  --color-pandan-soft: #dcebe3;
+  --color-teh: #a8650f;
+  --color-teh-soft: #fbead0;
+  --color-chili: #b42318;
+  --color-chili-soft: #fbe3de;
+  --color-slip: #fffdf8;
+  --color-rail: #24211d;
+  --color-on-ink: #fff4de;
   --color-on-brand: #ffffff;
 
-  --radius-xs: 1px;
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
-  --radius-2xl: 6px;
-  --radius-3xl: 8px;
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 18px;
 
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
@@ -45,46 +47,84 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-ink: #f1efe8;
-    --color-ink-soft: #c2bfb6;
-    --color-mute: #8f8b81;
-    --color-paper: #121211;
-    --color-surface: #1c1b19;
-    --color-line: #34322d;
-    --color-edge: #4a4740;
-    --color-tag: #f2b01e;
-    --color-tag-soft: #3a2f12;
-    --color-sign: #d8382b;
-    --color-cta: #f2b01e;
-    --color-on-cta: #141414;
-    --color-pandan: #2f9a65;
-    --color-pandan-dark: #74d3a3;
-    --color-pandan-soft: #17301f;
+    --color-ink: #fff4de;
+    --color-ink-soft: #d6cbb6;
+    --color-mute: #9c9384;
+    --color-paper: #1b1916;
+    --color-surface: #24211d;
+    --color-line: #3a352e;
+    --color-edge: #544d43;
+    --color-tag: #e8473a;
+    --color-on-tag: #fff4de;
+    --color-tag-soft: #3d1f1a;
+    --color-sign: #d92d20;
+    --color-cta: #e8473a;
+    --color-on-cta: #fff4de;
+    --color-pandan: #3f8a72;
+    --color-pandan-dark: #8fcbb4;
+    --color-pandan-soft: #1c2e27;
     --color-teh: #e2a552;
     --color-teh-soft: #3a2c17;
-    --color-chili: #ef6b5f;
+    --color-chili: #f0705f;
     --color-chili-soft: #3d1e1c;
-    --color-slip: #24231f;
-    --color-rail: #0b0b0a;
-    --color-on-ink: #121211;
+    --color-slip: #2a2622;
+    --color-rail: #12100e;
+    --color-on-ink: #1b1916;
     color-scheme: dark;
   }
 }
 
-/* Signboard lettering: every display heading is condensed capitals. */
+/* Marketing pages keep the brand's cream-and-red look whatever the device theme is. */
+.theme-light {
+  --color-ink: #24211d;
+  --color-ink-soft: #57514a;
+  --color-mute: #857d72;
+  --color-paper: #fff4de;
+  --color-surface: #fffbf3;
+  --color-line: #ecdfc6;
+  --color-edge: #24211d;
+  --color-tag: #d92d20;
+  --color-on-tag: #fff4de;
+  --color-tag-soft: #fbe2d9;
+  --color-cta: #d92d20;
+  --color-on-cta: #fff4de;
+  --color-pandan: #28584a;
+  --color-pandan-dark: #1f463b;
+  --color-pandan-soft: #dcebe3;
+  --color-teh: #a8650f;
+  --color-teh-soft: #fbead0;
+  --color-chili: #b42318;
+  --color-chili-soft: #fbe3de;
+  --color-on-ink: #fff4de;
+  color-scheme: light;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+@keyframes ticket-in {
+  from {
+    transform: translateY(14px) rotate(3deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) rotate(3deg);
+    opacity: 1;
+  }
+}
+.ticket-in {
+  animation: ticket-in 0.7s 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Headings: heavy, tight, sentence case ("Order. Pay. Settle."). */
 .font-display {
-  font-stretch: 72%;
+  font-stretch: 88%;
   font-weight: 850;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.02em;
   line-height: 1.05;
 }
-/* A price or label printed on a mustard tag. */
+/* A price or amount called out in chilli red. */
 .tag {
-  display: inline-block;
-  background: var(--color-tag);
-  color: #141414;
-  padding: 1px 6px;
+  color: var(--color-tag);
   font-weight: 800;
 }
 
