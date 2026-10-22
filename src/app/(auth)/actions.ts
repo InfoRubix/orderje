@@ -2,6 +2,8 @@
 
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { requestLang } from "@/lib/i18n/server";
+import { makeT } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { col, fs, isAlreadyExists } from "@/db";
@@ -20,13 +22,14 @@ async function startSession(u: Pick<User, "id" | "tenantId" | "role" | "name" | 
 }
 
 export async function login(_: AuthState, form: FormData): Promise<AuthState> {
+  const t = makeT(await requestLang());
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   const u = email ? await getUserByEmail(email) : undefined;
-  if (!u || !(await bcrypt.compare(password, u.passwordHash))) return { error: "Email or password is incorrect." };
-  if (!u.active) return { error: "This account has been deactivated. Ask the owner to reactivate it." };
-  const t = await getTenant(u.tenantId);
-  if (!t?.active) return { error: "This kedai's subscription is suspended. Contact Rubix support." };
+  if (!u || !(await bcrypt.compare(password, u.passwordHash))) return { error: t("Email or password is incorrect.") };
+  if (!u.active) return { error: t("This account has been deactivated. Ask the owner to reactivate it.") };
+  const tenant = await getTenant(u.tenantId);
+  if (!tenant?.active) return { error: t("This kedai's subscription is suspended. Contact Rubix support.") };
   await startSession(u);
   redirect(homeFor(u.role));
 }
@@ -47,14 +50,15 @@ const signupSchema = z.object({
 });
 
 export async function signup(_: AuthState, form: FormData): Promise<AuthState> {
-  if (process.env.ALLOW_SIGNUP === "false") return { error: "Sign-up is closed. Contact Rubix to get onboarded." };
+  const t = makeT(await requestLang());
+  if (process.env.ALLOW_SIGNUP === "false") return { error: t("Sign-up is closed. Contact Rubix to get onboarded.") };
   const raw = Object.fromEntries(form);
   const parsed = signupSchema.safeParse({ ...raw, slug: slugify(String(raw.slug || raw.shopName || "")) });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message) };
   const d = parsed.data;
 
-  const slugTaken = { error: `The link name "${d.slug}" is taken. Try another.` };
-  const emailTaken = { error: "An account with this email already exists. Log in instead." };
+  const slugTaken = { error: t("The link name \"{slug}\" is taken. Try another.", { slug: d.slug }) };
+  const emailTaken = { error: t("An account with this email already exists. Log in instead.") };
   if ((await col.slugs().doc(d.slug).get()).exists) return slugTaken;
   if (await getUserByEmail(d.email)) return emailTaken;
 
@@ -71,6 +75,7 @@ export async function signup(_: AuthState, form: FormData): Promise<AuthState> {
     logoUrl: null,
     logoPath: null,
     brandColor: DEFAULT_BRAND_COLOR,
+    language: await requestLang(),
     sstRate: 0,
     serviceChargeRate: 0,
     memberDiscountRate: 500,

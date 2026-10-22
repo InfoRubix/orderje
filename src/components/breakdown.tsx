@@ -1,8 +1,16 @@
 import { rm } from "@/lib/money";
 
 /** Share-of-total rows: label + count on the left, amount + share on the right, one-hue bar. */
-export function Breakdown({ rows, total }: { rows: { label: string; value: number; n: number }[]; total: number }) {
-  if (!rows.some((r) => r.value > 0)) return <p className="text-sm text-mute">No sales in this period.</p>;
+export function Breakdown({
+  rows,
+  total,
+  empty = "No sales in this period.",
+}: {
+  rows: { label: string; value: number; n: number }[];
+  total: number;
+  empty?: string;
+}) {
+  if (!rows.some((r) => r.value > 0)) return <p className="text-sm text-mute">{empty}</p>;
   return (
     <ul className="space-y-3">
       {rows.map((r) => {

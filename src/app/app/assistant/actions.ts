@@ -11,17 +11,18 @@ import { askMenuAssistant, type ChatTurn } from "@/lib/ai";
 import { deleteImage, getImage, putImage, putImageBytes } from "@/lib/images";
 import { toSen } from "@/lib/money";
 import { OrderError } from "@/lib/orders";
+import { makeT, translate, UserError, type Lang } from "@/lib/i18n";
 import { listCategories } from "@/lib/repo";
 import { uid } from "@/lib/utils";
 
 type Result<T> = ({ ok: true } & T) | { ok?: false; error: string };
 
-function fail(e: unknown): { error: string } {
-  if (e instanceof OrderError) return { error: e.message };
-  if (e instanceof z.ZodError) return { error: e.issues[0]?.message ?? "Semak semula draf." };
+function fail(e: unknown, lang: Lang): { error: string } {
+  if (e instanceof UserError) return { error: e.in(lang) };
+  if (e instanceof z.ZodError) return { error: translate(lang, e.issues[0]?.message ?? "Check the draft.") };
   unstable_rethrow(e);
   console.error(e);
-  return { error: "Ada masalah dan tiada apa yang disimpan. Cuba lagi." };
+  return { error: translate(lang, "Something went wrong and nothing was saved. Please try again.") };
 }
 
 /* ------------------------------------------------------------------ draft shape */
@@ -31,7 +32,7 @@ const DraftChangeS = z.object({
   key: z.string(),
   op: z.enum(["add", "update", "remove"]),
   itemId: z.string().nullable(),
-  name: z.string().trim().min(1, "Setiap item perlukan nama.").max(120),
+  name: z.string().trim().min(1, "Every item needs a name.").max(120),
   price: z.string(),
   description: z.string().max(255),
   category: z.string().max(40),
@@ -39,7 +40,7 @@ const DraftChangeS = z.object({
   groups: z
     .array(
       z.object({
-        name: z.string().trim().min(1, "Setiap kumpulan pilihan perlukan nama.").max(80),
+        name: z.string().trim().min(1, "Every choice group needs a name.").max(80),
         required: z.boolean(),
         maxSelect: z.number().int().min(1).max(20),
         options: z.array(z.object({ name: z.string().trim().min(1).max(80), price: z.string() })).min(1).max(30),
@@ -60,13 +61,14 @@ const rm = (n: number | null) => (n === null || n === undefined ? "" : n.toFixed
 /** Stores a poster or food photo (already shrunk in the browser) for the assistant to read. */
 export async function uploadAssistantImage(f: FormData): Promise<Result<{ id: string; url: string }>> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const file = f.get("image");
-    if (!(file instanceof File) || !file.size) return { error: "Pilih gambar dulu." };
+    if (!(file instanceof File) || !file.size) return { error: t("Choose an image first.") };
     const up = await putImage(tenant.id, file, "ai-source");
     return { ok: true, id: up.path, url: up.url };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
@@ -77,11 +79,12 @@ export async function askAssistant(input: {
   draft: Draft | null;
 }): Promise<Result<{ reply: string; draft: Draft; left: number }>> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const history = z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(8000) })).max(40).parse(input.history);
     const message = z.string().max(4000).parse(input.message);
     const imageIds = z.array(z.string().max(40)).max(8).parse(input.imageIds);
-    if (!message.trim() && !imageIds.length) return { error: "Tulis sesuatu atau lampirkan gambar." };
+    if (!message.trim() && !imageIds.length) return { error: t("Write something or attach an image.") };
 
     const { proposal, left } = await askMenuAssistant({ tenant, history, message, imageIds, draft: input.draft });
     const previous = new Map((input.draft?.changes ?? []).map((c) => [`${c.op}:${c.itemId ?? c.name.toLowerCase()}`, c]));
@@ -114,14 +117,14 @@ export async function askAssistant(input: {
     };
     return { ok: true, reply: proposal.reply, draft, left };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
 /** Crops the item's photo out of the poster, scaled for the menu. Box is 0-1000 of the image. */
 async function cropPhoto(tenantId: string, photo: NonNullable<DraftChange["photo"]>) {
   const src = await getImage(tenantId, photo.imageId);
-  if (!src) throw new OrderError("Gambar asal untuk salah satu item sudah tiada. Lampirkan semula poster.");
+  if (!src) throw new OrderError("The original image for one of the items is gone. Attach the poster again.");
   const meta = await sharp(src.data).metadata();
   const W = meta.width ?? 0;
   const H = meta.height ?? 0;
@@ -151,7 +154,7 @@ function toGroups(menuItemId: string, groups: NonNullable<DraftChange["groups"]>
       sort: gi,
       options: g.options.map((o, oi) => {
         const p = o.price.trim() ? toSen(o.price) : 0;
-        if (!Number.isFinite(p) || p < 0) throw new OrderError(`Semak harga tambahan "${o.name}" untuk ${name}.`);
+        if (!Number.isFinite(p) || p < 0) throw new OrderError('Check the extra price for "{option}" on {name}.', { option: o.name, name });
         return { id: uid(), groupId, name: o.name, price: p, sort: oi };
       }),
     };
@@ -161,21 +164,22 @@ function toGroups(menuItemId: string, groups: NonNullable<DraftChange["groups"]>
 /** Applies the reviewed draft: creates categories, adds/updates/removes items, crops photos. */
 export async function applyDraft(input: Draft): Promise<Result<{ message: string }>> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const draft = DraftS.parse(input);
-    if (!draft.changes.length) return { error: "Draf kosong." };
+    if (!draft.changes.length) return { error: t("The draft is empty.") };
 
     // Check everything before writing anything.
     const problems: string[] = [];
     for (const c of draft.changes) {
       if (c.op === "remove") continue;
-      if (c.op === "add" && !c.category.trim()) problems.push(`${c.name}: pilih kategori`);
+      if (c.op === "add" && !c.category.trim()) problems.push(t("{name}: pick a category", { name: c.name }));
       if (c.op === "add" || c.price.trim()) {
         const p = toSen(c.price);
-        if (!Number.isFinite(p) || p <= 0) problems.push(`${c.name}: harga belum betul`);
+        if (!Number.isFinite(p) || p <= 0) problems.push(t("{name}: price isn't right yet", { name: c.name }));
       }
     }
-    if (problems.length) return { error: `Betulkan dulu: ${problems.join("; ")}.` };
+    if (problems.length) return { error: t("Fix these first: {problems}.", { problems: problems.join("; ") }) };
 
     // Categories by name, creating the missing ones at the end of the menu.
     const cats = await listCategories(tenant.id);
@@ -227,7 +231,7 @@ export async function applyDraft(input: Draft): Promise<Result<{ message: string
         const ref = items.doc(c.itemId);
         const oldPhoto = await fs().runTransaction(async (tx) => {
           const old = read<MenuItem>(await tx.get(ref));
-          if (!old) throw new OrderError(`${c.name} sudah tiada dalam menu.`);
+          if (!old) throw new OrderError("{name} is no longer on the menu.", { name: c.name });
           const patch: Partial<MenuItem> = { name: c.name };
           if (c.price.trim()) patch.price = toSen(c.price);
           if (c.description.trim()) patch.description = c.description.trim();
@@ -244,9 +248,13 @@ export async function applyDraft(input: Draft): Promise<Result<{ message: string
     }
 
     revalidatePath("/app/menu");
-    const parts = [added && `${added} ditambah`, updated && `${updated} dikemas kini`, removed && `${removed} dibuang`].filter(Boolean);
-    return { ok: true, message: `Menu disimpan: ${parts.join(", ") || "tiada perubahan"}.` };
+    const parts = [
+      added && t("{n} added", { n: added }),
+      updated && t("{n} updated", { n: updated }),
+      removed && t("{n} removed", { n: removed }),
+    ].filter(Boolean);
+    return { ok: true, message: t("Menu saved: {parts}.", { parts: parts.join(", ") || t("no changes") }) };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { col, read, readAll } from "@/db";
 import { DEFAULT_BRAND_COLOR } from "@/db/schema";
+import { DEFAULT_LANG, isLang } from "@/lib/i18n";
 import type {
   Category,
   Customer,
@@ -21,7 +22,7 @@ const bySortThenName = <T extends { sort: number; name?: string; label?: string 
 export async function getTenant(id: string) {
   const t = read<Tenant>(await col.tenants().doc(id).get());
   // Kedai created before branding existed have no brand fields yet.
-  return t && { ...t, tagline: t.tagline ?? null, logoUrl: t.logoUrl ?? null, logoPath: t.logoPath ?? null, brandColor: t.brandColor || DEFAULT_BRAND_COLOR };
+  return t && { ...t, tagline: t.tagline ?? null, logoUrl: t.logoUrl ?? null, logoPath: t.logoPath ?? null, brandColor: t.brandColor || DEFAULT_BRAND_COLOR, language: isLang(t.language) ? t.language : DEFAULT_LANG };
 }
 
 export async function getTenantBySlug(slug: string) {

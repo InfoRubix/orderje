@@ -28,6 +28,7 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Staff logins with roles: owner, cashier, kitchen.
 - Settings: SST, service charge (dine-in only), member/staff discount.
 - Light and dark mode follow the device.
+- **English or Bahasa Melayu** per kedai (Settings → Language): staff screens, the customer menu, order page, receipt and error messages all follow it. Login and signup have a BM | EN switch; a new kedai starts in the language chosen there. Translations live in `src/lib/i18n/ms/` keyed by the English text, so a missing phrase falls back to English.
 
 **AI Menu (owner)** at `/app/assistant`
 - Chat with an assistant (OpenAI, `OPENAI_MODEL`, default `gpt-6.1-sol`). Attach a menu poster or food photos, or type a list ("Tambah Teh O Ais RM2.50 dalam Minuman", "Set B naik 50 sen", "Roti Telur habis hari ini").

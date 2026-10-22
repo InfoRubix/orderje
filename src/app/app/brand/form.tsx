@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { ItemThumb, ShopLogo } from "@/components/thumb";
 import { keep } from "@/lib/keep-form";
+import { useT } from "@/components/i18n";
 import { saveBrand } from "../actions";
 
 type Brand = {
@@ -21,10 +22,11 @@ type Brand = {
 };
 type Sample = { id: string; name: string; price: number; imageUrl: string | null };
 
-export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
-  const [b, setB] = useState(t);
+export function BrandForm({ brand, sample }: { brand: Brand; sample: Sample[] }) {
+  const t = useT();
+  const [b, setB] = useState(brand);
   const [logo, setLogo] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(t.logoUrl);
+  const [preview, setPreview] = useState<string | null>(brand.logoUrl);
   const [removeLogo, setRemoveLogo] = useState(false);
   const [logoErr, setLogoErr] = useState<string>();
   const [state, action, pending] = useActionState(saveBrand, undefined);
@@ -61,24 +63,24 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
         className="space-y-5"
       >
         <Card className="space-y-4 p-5">
-          <h2 className="font-display text-lg font-bold">Logo</h2>
+          <h2 className="font-display text-lg font-bold">{t("Logo")}</h2>
           <div className="flex flex-wrap items-center gap-4">
             <div className="grid size-28 place-items-center overflow-hidden rounded-xl border-2 border-edge bg-paper">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview} alt="Current logo" className="size-full object-contain" />
+                <img src={preview} alt={t("Current logo")} className="size-full object-contain" />
               ) : (
-                <span className="text-sm text-mute">No logo</span>
+                <span className="text-sm text-mute">{t("No logo")}</span>
               )}
             </div>
             <div className="space-y-2">
               <label className="inline-flex h-10 cursor-pointer items-center rounded-md border-2 border-edge bg-surface px-4 text-sm font-semibold hover:bg-paper">
-                Upload logo
+                {t("Upload logo")}
                 <input
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  aria-label="Upload logo"
+                  aria-label={t("Upload logo")}
                   onChange={(e) => pickLogo(e.target.files?.[0])}
                 />
               </label>
@@ -92,30 +94,30 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
                     setRemoveLogo(true);
                   }}
                 >
-                  Remove logo
+                  {t("Remove logo")}
                 </button>
               ) : null}
-              <p className="text-xs text-mute">Square works best. We shrink it automatically.</p>
+              <p className="text-xs text-mute">{t("Square works best. We shrink it automatically.")}</p>
             </div>
           </div>
           <FormError message={logoErr} />
         </Card>
 
         <Card className="grid gap-4 p-5 sm:grid-cols-2">
-          <h2 className="font-display text-lg font-bold sm:col-span-2">Kedai details</h2>
-          <Field label="Kedai name" className="sm:col-span-2">
+          <h2 className="font-display text-lg font-bold sm:col-span-2">{t("Kedai details")}</h2>
+          <Field label={t("Kedai name")} className="sm:col-span-2">
             <Input name="name" value={b.name} onChange={set("name")} maxLength={60} required />
           </Field>
-          <Field label="Short description" hint="Shown under your name at the top of the menu" className="sm:col-span-2">
-            <Input name="tagline" value={b.tagline} onChange={set("tagline")} maxLength={80} placeholder="e.g. Mamak 24 jam sejak 1998" />
+          <Field label={t("Short description")} hint={t("Shown under your name at the top of the menu")} className="sm:col-span-2">
+            <Input name="tagline" value={b.tagline} onChange={set("tagline")} maxLength={80} placeholder={t("e.g. Mamak 24 jam sejak 1998")} />
           </Field>
-          <Field label="Address" className="sm:col-span-2">
+          <Field label={t("Address")} className="sm:col-span-2">
             <Input name="address" value={b.address} onChange={set("address")} maxLength={160} />
           </Field>
-          <Field label="Phone">
+          <Field label={t("Phone")}>
             <Input name="phone" value={b.phone} onChange={set("phone")} maxLength={32} inputMode="tel" />
           </Field>
-          <Field label="Receipt message" hint="Printed at the bottom of every receipt">
+          <Field label={t("Receipt message")} hint={t("Printed at the bottom of every receipt")}>
             <Input
               name="receiptFooter"
               value={b.receiptFooter}
@@ -127,8 +129,8 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
         </Card>
 
         <Card className="space-y-3 p-5">
-          <h2 className="font-display text-lg font-bold">Brand colour</h2>
-          <p className="-mt-2 text-sm text-ink-soft">Used for the menu header, buttons and prices customers see.</p>
+          <h2 className="font-display text-lg font-bold">{t("Brand colour")}</h2>
+          <p className="-mt-2 text-sm text-ink-soft">{t("Used for the menu header, buttons and prices customers see.")}</p>
           <input type="hidden" name="brandColor" value={b.brandColor} />
           <div className="flex flex-wrap items-center gap-2.5">
             {BRAND_PRESETS.map(([name, hex]) => (
@@ -147,13 +149,13 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
               />
             ))}
             <label className="ml-1 flex items-center gap-2 text-sm text-ink-soft">
-              Custom
+              {t("Custom")}
               <input
                 type="color"
                 value={b.brandColor}
                 onChange={(e) => setB((x) => ({ ...x, brandColor: e.target.value }))}
                 className="size-9 cursor-pointer rounded border border-line bg-surface"
-                aria-label="Custom brand colour"
+                aria-label={t("Custom brand colour")}
               />
             </label>
           </div>
@@ -161,7 +163,7 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
 
         <div className="sticky bottom-20 flex flex-wrap items-center gap-3 rounded-xl border-2 border-edge bg-surface p-3 md:bottom-4">
           <Button size="lg" disabled={pending}>
-            {pending ? "Saving…" : "Save"}
+            {pending ? t("Saving…") : t("Save")}
           </Button>
           {state?.message ? <span className="text-sm font-semibold text-pandan-dark">{state.message}</span> : null}
           <FormError message={state?.error} />
@@ -169,13 +171,13 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
       </form>
 
       <aside className="space-y-2 lg:sticky lg:top-6">
-        <p className="text-sm font-semibold text-ink-soft">Live preview</p>
+        <p className="text-sm font-semibold text-ink-soft">{t("Live preview")}</p>
         <div className="brand overflow-hidden rounded-[28px] border-[6px] border-[#24211d] bg-paper" style={brandStyle(b.brandColor)}>
           <div className="border-b-4 border-edge bg-pandan px-5 pb-5 pt-5 text-on-brand">
-            <p className="text-sm opacity-80">You&apos;re at Meja 3</p>
+            <p className="text-sm opacity-80">{t("You're at {table}", { table: "Meja 3" })}</p>
             <div className="mt-1.5 flex items-center gap-3">
               <ShopLogo name={b.name || "?"} src={preview} className="size-12" />
-              <p className="min-w-0 font-display text-3xl">{b.name || "Your kedai"}</p>
+              <p className="min-w-0 font-display text-3xl">{b.name || t("Your kedai")}</p>
             </div>
             {b.tagline ? <p className="mt-2 text-sm opacity-90">{b.tagline}</p> : null}
           </div>
@@ -194,10 +196,10 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
                 ))}
               </ul>
             ) : (
-              <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">Add menu items to see them here.</p>
+              <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">{t("Add menu items to see them here.")}</p>
             )}
             <div className="grid h-11 place-items-center rounded-xl bg-cta text-sm font-bold text-on-cta">
-              Send order to kitchen
+              {t("Send order to kitchen")}
             </div>
           </div>
         </div>

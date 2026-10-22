@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { brandStyle } from "@/lib/brand";
 import { Button, FormError, Input, Textarea } from "@/components/ui";
 import { ItemThumb, ShopLogo } from "@/components/thumb";
+import { useT } from "@/components/i18n";
 import { placeQrOrder } from "../../actions";
 
 type Rates = Parameters<typeof computeTotals>[0];
@@ -41,6 +42,7 @@ export function CustomerMenu({
   rates: Rates;
 }) {
   const router = useRouter();
+  const t = useT();
   const storageKey = `oj-cart:${slug}:${table}`;
   const [cart, setCart] = useState<CartLine[]>([]);
   const [picking, setPicking] = useState<MenuItemFull | null>(null);
@@ -93,7 +95,7 @@ export function CustomerMenu({
   return (
     <div className="brand mx-auto min-h-dvh max-w-xl bg-paper pb-28" style={brandStyle(shop.brandColor)}>
       <header className="border-b-4 border-edge bg-pandan px-5 pb-5 pt-6 text-on-brand">
-        <p className="text-sm opacity-80">{tableLabel ? `You're at ${tableLabel}` : "Takeaway order"}</p>
+        <p className="text-sm opacity-80">{tableLabel ? t("You're at {table}", { table: tableLabel }) : t("Takeaway order")}</p>
         <div className="mt-1.5 flex items-center gap-3">
           <ShopLogo name={shop.name} src={shop.logoUrl} className="size-14" />
           <h1 className="min-w-0 font-display text-4xl">{shop.name}</h1>
@@ -118,7 +120,7 @@ export function CustomerMenu({
       </nav>
 
       {menu.length === 0 ? (
-        <p className="p-8 text-center text-ink-soft">The menu is being updated. Please order at the counter.</p>
+        <p className="p-8 text-center text-ink-soft">{t("The menu is being updated. Please order at the counter.")}</p>
       ) : null}
 
       {menu.map((c) => (
@@ -170,7 +172,7 @@ export function CustomerMenu({
             className="flex h-14 w-full items-center justify-between rounded-xl border-2 border-edge bg-cta px-5 text-on-cta"
           >
             <span className="flex items-center gap-2 font-semibold">
-              <ShoppingBag className="size-5" aria-hidden /> View order ({count})
+              <ShoppingBag className="size-5" aria-hidden /> {t("View order ({n})", { n: count })}
             </span>
             <span className="num font-bold">{rm(totals.total)}</span>
           </button>
@@ -228,13 +230,14 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
       document.body.style.overflow = "";
     };
   }, [onClose]);
+  const t = useT();
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={title}>
-      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
+      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label={t("Close")} />
       <div className="relative flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-xl border-x-2 border-t-2 border-edge bg-surface">
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="font-display text-2xl">{title}</h2>
-          <button onClick={onClose} className="rounded-sm p-1 text-ink-soft hover:bg-paper" aria-label="Close">
+          <button onClick={onClose} className="rounded-sm p-1 text-ink-soft hover:bg-paper" aria-label={t("Close")}>
             <X className="size-5" />
           </button>
         </div>
@@ -245,6 +248,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function Stepper({ value, onChange, min = 1 }: { value: number; onChange: (n: number) => void; min?: number }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-1 rounded-md border-2 border-edge">
       <button
@@ -252,7 +256,7 @@ function Stepper({ value, onChange, min = 1 }: { value: number; onChange: (n: nu
         className="grid size-10 place-items-center text-ink-soft disabled:opacity-30"
         onClick={() => onChange(value - 1)}
         disabled={value <= min}
-        aria-label="Less"
+        aria-label={t("Less")}
       >
         <Minus className="size-4" />
       </button>
@@ -261,7 +265,7 @@ function Stepper({ value, onChange, min = 1 }: { value: number; onChange: (n: nu
         type="button"
         className="grid size-10 place-items-center text-ink-soft"
         onClick={() => onChange(Math.min(99, value + 1))}
-        aria-label="More"
+        aria-label={t("More")}
       >
         <Plus className="size-4" />
       </button>
@@ -278,6 +282,7 @@ function ItemSheet({
   onClose: () => void;
   onAdd: (l: Omit<CartLine, "key">) => void;
 }) {
+  const t = useT();
   const [qty, setQty] = useState(1);
   const [optionIds, setOptionIds] = useState<string[]>([]);
   const [note, setNote] = useState("");
@@ -308,8 +313,8 @@ function ItemSheet({
             <legend className="mb-2 flex w-full items-baseline justify-between">
               <span className="font-semibold">{g.name}</span>
               <span className={cn("text-xs", g.required ? "font-semibold text-teh" : "text-mute")}>
-                {g.required ? "Required" : "Optional"}
-                {g.maxSelect > 1 ? `, up to ${g.maxSelect}` : ""}
+                {g.required ? t("Required") : t("Optional")}
+                {g.maxSelect > 1 ? t(", up to {n}", { n: g.maxSelect }) : ""}
               </span>
             </legend>
             <div className="divide-y divide-line rounded-md border-2 border-edge">
@@ -334,8 +339,8 @@ function ItemSheet({
           </fieldset>
         ))}
         <label className="block">
-          <span className="mb-1.5 block font-semibold">Note for the kitchen</span>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={160} placeholder="e.g. no onion" />
+          <span className="mb-1.5 block font-semibold">{t("Note for the kitchen")}</span>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={160} placeholder={t("e.g. no onion")} />
         </label>
       </div>
       <div className="flex items-center gap-3 border-t border-line px-5 py-4">
@@ -346,7 +351,9 @@ function ItemSheet({
           disabled={missing.length > 0}
           onClick={() => onAdd({ item, qty, optionIds, note: note.trim() })}
         >
-          {missing.length ? `Choose ${missing[0].name}` : `Add · ${rm(unitPrice(item, optionIds) * qty)}`}
+          {missing.length
+            ? t("Choose {group}", { group: missing[0].name })
+            : t("Add · {price}", { price: rm(unitPrice(item, optionIds) * qty) })}
         </Button>
       </div>
     </Sheet>
@@ -370,6 +377,7 @@ function CartSheet({
   onClose: () => void;
   onPlace: (info: { customerName?: string; customerPhone?: string; note?: string }) => Promise<string | undefined>;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
@@ -379,22 +387,22 @@ function CartSheet({
   const lines = useMemo(() => cart, [cart]);
 
   return (
-    <Sheet title="Your order" onClose={onClose}>
+    <Sheet title={t("Your order")} onClose={onClose}>
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
         {setOrderType ? (
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-paper p-1" role="radiogroup" aria-label="Order type">
-            {(["dine_in", "takeaway"] as const).map((t) => (
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-paper p-1" role="radiogroup" aria-label={t("Order type")}>
+            {(["dine_in", "takeaway"] as const).map((type) => (
               <button
-                key={t}
+                key={type}
                 role="radio"
-                aria-checked={orderType === t}
-                onClick={() => setOrderType(t)}
+                aria-checked={orderType === type}
+                onClick={() => setOrderType(type)}
                 className={cn(
                   "rounded-md py-2 text-sm font-semibold",
-                  orderType === t ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
+                  orderType === type ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
                 )}
               >
-                {t === "dine_in" ? "Makan sini" : "Bungkus"}
+                {type === "dine_in" ? "Makan sini" : "Bungkus"}
               </button>
             ))}
           </div>
@@ -424,7 +432,7 @@ function CartSheet({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={needsName ? "Your name (required)" : "Your name (optional)"}
+            placeholder={needsName ? t("Your name (required)") : t("Your name (optional)")}
             maxLength={120}
             autoComplete="name"
           />
@@ -432,21 +440,21 @@ function CartSheet({
             <Input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone (optional)"
+              placeholder={t("Phone (optional)")}
               inputMode="tel"
               maxLength={32}
               autoComplete="tel"
             />
           ) : null}
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the whole order" maxLength={255} />
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Note for the whole order")} maxLength={255} />
         </div>
 
         <dl className="num space-y-1 text-sm">
-          <Row label="Subtotal" value={totals.subtotal} />
-          {totals.serviceCharge ? <Row label="Service charge" value={totals.serviceCharge} /> : null}
-          {totals.sst ? <Row label="SST" value={totals.sst} /> : null}
+          <Row label={t("Subtotal")} value={totals.subtotal} />
+          {totals.serviceCharge ? <Row label={t("Service charge")} value={totals.serviceCharge} /> : null}
+          {totals.sst ? <Row label={t("SST")} value={totals.sst} /> : null}
           <div className="flex justify-between pt-1 text-base font-bold">
-            <dt>Total</dt>
+            <dt>{t("Total")}</dt>
             <dd>{rm(totals.total)}</dd>
           </div>
         </dl>
@@ -465,9 +473,9 @@ function CartSheet({
             })
           }
         >
-          {pending ? "Sending to kitchen…" : "Send order to kitchen"}
+          {pending ? t("Sending to kitchen…") : t("Send order to kitchen")}
         </Button>
-        <p className="mt-2 text-center text-xs text-mute">Pay at the counter when you are done.</p>
+        <p className="mt-2 text-center text-xs text-mute">{t("Pay at the counter when you are done.")}</p>
       </div>
     </Sheet>
   );

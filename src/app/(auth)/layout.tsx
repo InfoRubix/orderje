@@ -2,11 +2,22 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { Logo } from "@/components/brand";
 import { Awning, KitchenTicket, PhoneMenu } from "@/components/landing/graphics";
+import { I18nProvider } from "@/components/i18n";
+import { makeT } from "@/lib/i18n";
+import { requestLang } from "@/lib/i18n/server";
+import { LangSwitch } from "./lang-switch";
 
-const POINTS = ["Customer scan QR, terus order dari meja", "Dapur nampak tiket serta-merta", "Tutup kedai dengan rekon yang tepat"];
+const POINTS = [
+  "Customers scan the QR and order right from the table",
+  "The kitchen sees the ticket instantly",
+  "Close the kedai with an accurate recon",
+];
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const lang = await requestLang();
+  const t = makeT(lang);
   return (
+    <I18nProvider lang={lang}>
     <main className="grid min-h-dvh md:grid-cols-[1fr_minmax(0,520px)]">
       <section className="relative hidden overflow-hidden border-r-[6px] border-[#24211d] bg-sign text-cream md:flex md:flex-col">
         <Awning id="awning-auth" className="h-10 shrink-0" />
@@ -33,7 +44,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   <span className="grid size-6 shrink-0 place-items-center rounded-md bg-cream text-sign">
                     <Check className="size-4" strokeWidth={3} aria-hidden />
                   </span>
-                  {p}
+                  {t(p)}
                 </li>
               ))}
             </ul>
@@ -48,7 +59,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </section>
 
-      <section className="flex items-center justify-center p-6">
+      <section className="relative flex items-center justify-center p-6">
+        <div className="absolute right-6 top-6">
+          <LangSwitch />
+        </div>
         <div className="w-full max-w-sm">
           <Link href="/" aria-label="OrderTerus" className="mb-8 inline-block md:hidden">
             <Logo className="w-44" />
@@ -57,5 +71,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </section>
     </main>
+    </I18nProvider>
   );
 }

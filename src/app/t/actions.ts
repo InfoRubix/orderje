@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { makeT, translate } from "@/lib/i18n";
 import { createOrder, OrderError } from "@/lib/orders";
 import { getTableByToken, getTenantBySlug } from "@/lib/repo";
 
@@ -26,19 +27,25 @@ const schema = z.object({
 
 export async function placeQrOrder(input: z.infer<typeof schema>): Promise<{ token?: string; error?: string }> {
   const parsed = schema.safeParse(input);
-  if (!parsed.success) return { error: "Something in the cart looks wrong. Refresh and try again." };
+  if (!parsed.success) {
+    // Still answer in the kedai's language when the slug itself is fine.
+    const slug = typeof input?.slug === "string" && /^[\w-]{1,64}$/.test(input.slug) ? input.slug : "";
+    const kedai = slug ? await getTenantBySlug(slug) : undefined;
+    return { error: translate(kedai?.language ?? "en", "Something in the cart looks wrong. Refresh and try again.") };
+  }
   const d = parsed.data;
   const tenant = await getTenantBySlug(d.slug);
-  if (!tenant) return { error: "Kedai not found." };
+  if (!tenant) return { error: translate("en", "Kedai not found.") };
+  const tr = makeT(tenant.language);
 
   let tableId: string | null = null;
   if (d.table !== "takeaway") {
     const t = await getTableByToken(tenant.id, d.table);
-    if (!t) return { error: "This table QR is not recognised. Ask the counter." };
+    if (!t) return { error: tr("This table QR is not recognised. Ask the counter.") };
     tableId = t.id;
   }
   if (d.orderType === "takeaway" && !d.customerName?.trim())
-    return { error: "Add your name so we can call you when it's ready." };
+    return { error: tr("Add your name so we can call you when it's ready.") };
 
   try {
     const o = await createOrder({
@@ -53,8 +60,8 @@ export async function placeQrOrder(input: z.infer<typeof schema>): Promise<{ tok
     });
     return { token: o.publicToken };
   } catch (e) {
-    if (e instanceof OrderError) return { error: e.message };
+    if (e instanceof OrderError) return { error: e.in(tenant.language) };
     console.error(e);
-    return { error: "Couldn't send the order. Try again or order at the counter." };
+    return { error: tr("Couldn't send the order. Try again or order at the counter.") };
   }
 }

@@ -5,25 +5,28 @@ import { useActionState, useState, useTransition } from "react";
 import { Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, FormError, Input } from "@/components/ui";
+import { useT } from "@/components/i18n";
 import { addTables, updateTable } from "../actions";
 
 export function PrintButton() {
+  const t = useT();
   return (
     <Button variant="secondary" onClick={() => window.print()}>
-      <Printer className="size-4" /> Print QR codes
+      <Printer className="size-4" /> {t("Print QR codes")}
     </Button>
   );
 }
 
 export function AddTables() {
+  const t = useT();
   const [state, action, pending] = useActionState(addTables, undefined);
   return (
     <form onSubmit={keep(action)} className="mb-6 flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium">Add</span>
-      <Input name="count" type="number" min={1} max={100} defaultValue={1} className="w-20" aria-label="How many" />
-      <Input name="prefix" defaultValue="Meja" className="w-32" aria-label="Name prefix" />
+      <span className="text-sm font-medium">{t("Add")}</span>
+      <Input name="count" type="number" min={1} max={100} defaultValue={1} className="w-20" aria-label={t("How many")} />
+      <Input name="prefix" defaultValue="Meja" className="w-32" aria-label={t("Name prefix")} />
       <Button variant="secondary" disabled={pending}>
-        Add tables
+        {t("Add tables")}
       </Button>
       <FormError message={state?.error} />
     </form>
@@ -49,6 +52,7 @@ export function TableCard({
   active?: boolean;
   caption: string;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(label);
   const [err, setErr] = useState<string>();
@@ -71,32 +75,32 @@ export function TableCard({
       <p className="text-sm font-semibold">{caption}</p>
       <div className="no-print mt-3 space-y-2 border-t border-line pt-3 text-left">
         <a href={url} target="_blank" rel="noreferrer" className="block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
-          Open as customer
+          {t("Open as customer")}
         </a>
         {id ? (
           editing ? (
             <div className="flex gap-1">
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-sm" aria-label="Table name" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-sm" aria-label={t("Table name")} />
               <Button size="sm" disabled={busy} onClick={() => run({ label: name })}>
-                Save
+                {t("Save")}
               </Button>
             </div>
           ) : (
             <div className="flex flex-wrap gap-1">
               <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-                Rename
+                {t("Rename")}
               </Button>
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ active: !active })}>
-                {active ? "Disable" : "Enable"}
+                {active ? t("Disable") : t("Enable")}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={busy}
-                title="Old printed QR stops working"
-                onClick={() => confirm("Make a new QR for this table? The old sticker will stop working.") && run({ regenerate: true })}
+                title={t("Old printed QR stops working")}
+                onClick={() => confirm(t("Make a new QR for this table? The old sticker will stop working.")) && run({ regenerate: true })}
               >
-                New QR
+                {t("New QR")}
               </Button>
             </div>
           )

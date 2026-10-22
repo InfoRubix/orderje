@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { makeT } from "@/lib/i18n";
 import { aiEnabled, quotaLeft, AI_DAILY_LIMIT } from "@/lib/ai";
 import { listCategories } from "@/lib/repo";
 import { Empty, PageHeader } from "@/components/ui";
@@ -10,11 +11,12 @@ export const maxDuration = 120;
 
 export default async function AssistantPage() {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   if (!aiEnabled()) {
     return (
       <div className="max-w-3xl">
-        <PageHeader title="AI Menu" />
-        <Empty title="AI belum disediakan">Minta Rubix tetapkan OPENAI_API_KEY untuk akaun ini.</Empty>
+        <PageHeader title={t("AI Menu")} />
+        <Empty title={t("AI isn't set up yet")}>{t("Ask Rubix to set OPENAI_API_KEY for this account.")}</Empty>
       </div>
     );
   }

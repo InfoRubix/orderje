@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { listTables } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
+import { makeT } from "@/lib/i18n";
 import { appUrl } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
 import { AddTables, PrintButton, TableCard } from "./client";
@@ -13,10 +14,11 @@ async function qrSvg(url: string) {
 
 export default async function TablesPage() {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const tables = await listTables(tenant.id);
   const base = `${appUrl()}/t/${tenant.slug}`;
   const cards = await Promise.all(
-    tables.map(async (t) => ({ ...t, url: `${base}/${t.token}`, svg: await qrSvg(`${base}/${t.token}`) })),
+    tables.map(async (tb) => ({ ...tb, url: `${base}/${tb.token}`, svg: await qrSvg(`${base}/${tb.token}`) })),
   );
   const takeawayUrl = `${base}/takeaway`;
   const takeawaySvg = await qrSvg(takeawayUrl);
@@ -25,8 +27,8 @@ export default async function TablesPage() {
     <div>
       <div className="no-print">
         <PageHeader
-          title="Tables & QR"
-          sub="Print and stick one QR on each table. Orders arrive tagged with the table name."
+          title={t("Tables & QR")}
+          sub={t("Print and stick one QR on each table. Orders arrive tagged with the table name.")}
           actions={<PrintButton />}
         />
         <AddTables />
@@ -35,22 +37,22 @@ export default async function TablesPage() {
         <TableCard
           shop={tenant.name}
           color={tenant.brandColor}
-          label="Takeaway"
+          label={t("Takeaway")}
           url={takeawayUrl}
           svg={takeawaySvg}
-          caption="Scan to order bungkus"
+          caption={t("Scan to order bungkus")}
         />
-        {cards.map((t) => (
+        {cards.map((tb) => (
           <TableCard
-            key={t.id}
-            id={t.id}
+            key={tb.id}
+            id={tb.id}
             shop={tenant.name}
             color={tenant.brandColor}
-            label={t.label}
-            url={t.url}
-            svg={t.svg}
-            active={t.active}
-            caption="Scan to order & pay"
+            label={tb.label}
+            url={tb.url}
+            svg={tb.svg}
+            active={tb.active}
+            caption={t("Scan to order & pay")}
           />
         ))}
       </div>

@@ -6,6 +6,7 @@ import type { CustomerType, OrderStatus, PaymentStatus } from "@/db/schema";
 import { cashRound, rm } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button, Card, FormError, Input, Select } from "@/components/ui";
+import { useT } from "@/components/i18n";
 import { changeOrderCustomer, setOrderStatus, takePayment, voidPayment } from "../../actions";
 
 type Cust = { id: string; type: string; name: string; phone: string | null; company: string | null; creditLimit: number };
@@ -34,6 +35,7 @@ export function PaymentPanel({
   owing: number;
   labels: Record<CustomerType, string>;
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, start] = useTransition();
   const [error, setError] = useState<string>();
@@ -80,11 +82,11 @@ export function PaymentPanel({
     return (
       <Card className="h-fit space-y-4 p-5 lg:sticky lg:top-6">
         <p className="font-display text-xl font-bold text-pandan-dark">
-          {order.paymentStatus === "credit" ? "Charged to company account" : "Paid"}
+          {order.paymentStatus === "credit" ? t("Charged to company account") : t("Paid")}
         </p>
         {done?.change ? (
           <div className="rounded-xl bg-ink p-4 text-on-ink">
-            <p className="text-sm opacity-70">Give change</p>
+            <p className="text-sm opacity-70">{t("Give change")}</p>
             <p className="num font-display text-4xl font-bold">{rm(done.change)}</p>
           </div>
         ) : null}
@@ -95,10 +97,10 @@ export function PaymentPanel({
             target="_blank"
             className="inline-flex h-12 items-center justify-center rounded-lg bg-pandan font-semibold text-white"
           >
-            Print receipt
+            {t("Print receipt")}
           </a>
           <Button variant="secondary" size="lg" onClick={() => router.push("/app/pos")}>
-            Back to counter
+            {t("Back to counter")}
           </Button>
         </div>
       </Card>
@@ -110,31 +112,31 @@ export function PaymentPanel({
   return (
     <Card className="h-fit space-y-5 p-5 lg:sticky lg:top-6">
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-soft">Customer type</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-soft">{t("Customer type")}</h2>
         <div className="grid grid-cols-4 gap-1 rounded-lg bg-paper p-1">
-          {(["walk_in", "member", "staff", "corporate"] as const).map((t) => (
+          {(["walk_in", "member", "staff", "corporate"] as const).map((k) => (
             <button
-              key={t}
+              key={k}
               disabled={locked}
               onClick={() => {
-                setType(t);
-                setCustId(t === order.customerType ? order.customerId ?? "" : "");
+                setType(k);
+                setCustId(k === order.customerType ? order.customerId ?? "" : "");
               }}
-              aria-pressed={type === t}
+              aria-pressed={type === k}
               className={cn(
                 "rounded-md py-2 text-xs font-semibold sm:text-sm",
-                type === t ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
+                type === k ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
               )}
             >
-              {labels[t]}
+              {t(labels[k])}
             </button>
           ))}
         </div>
         {type !== "walk_in" ? (
           <div className="mt-2">
             {options.length ? (
-              <Select value={custId} onChange={(e) => setCustId(e.target.value)} disabled={locked} aria-label="Customer">
-                <option value="">Pick {labels[type].toLowerCase()}…</option>
+              <Select value={custId} onChange={(e) => setCustId(e.target.value)} disabled={locked} aria-label={t("Customer")}>
+                <option value="">{t("Pick {type}…", { type: t(labels[type]).toLowerCase() })}</option>
                 {options.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -145,9 +147,9 @@ export function PaymentPanel({
               </Select>
             ) : (
               <p className="text-sm text-ink-soft">
-                No {labels[type].toLowerCase()} registered yet.{" "}
+                {t("No {type} registered yet.", { type: t(labels[type]).toLowerCase() })}{" "}
                 <a href="/app/customers" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
-                  Add one
+                  {t("Add one")}
                 </a>
               </p>
             )}
@@ -155,7 +157,7 @@ export function PaymentPanel({
         ) : null}
         {customerChanged ? (
           <Button className="mt-2 w-full" variant="dark" disabled={busy || (type !== "walk_in" && !custId)} onClick={applyCustomer}>
-            Apply {labels[type].toLowerCase()} pricing
+            {t("Apply {type} pricing", { type: t(labels[type]).toLowerCase() })}
           </Button>
         ) : null}
       </section>
@@ -163,7 +165,7 @@ export function PaymentPanel({
       <Totals order={order} />
 
       {order.status === "cancelled" ? (
-        <p className="rounded-lg bg-chili-soft p-3 text-sm font-semibold text-chili">This order was cancelled.</p>
+        <p className="rounded-lg bg-chili-soft p-3 text-sm font-semibold text-chili">{t("This order was cancelled.")}</p>
       ) : customerChanged ? null : (
         <section className="space-y-3">
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-paper p-1">
@@ -184,7 +186,7 @@ export function PaymentPanel({
                   method === m ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
                 )}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -192,8 +194,8 @@ export function PaymentPanel({
           {method === "cash" ? (
             <div className="space-y-2">
               <p className="text-sm text-ink-soft">
-                Cash due <span className="num font-bold text-ink">{rm(cashDue)}</span>
-                {cashDue !== order.total ? " (rounded to 5 sen)" : ""}
+                {t("Cash due")} <span className="num font-bold text-ink">{rm(cashDue)}</span>
+                {cashDue !== order.total ? ` ${t("(rounded to 5 sen)")}` : ""}
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {quick.map((v) => (
@@ -202,7 +204,7 @@ export function PaymentPanel({
                     onClick={() => setTendered((v / 100).toFixed(2))}
                     className="num rounded-md border-2 border-edge py-2 text-sm font-semibold hover:bg-tag-soft"
                   >
-                    {v === cashDue ? "Exact" : (v / 100).toFixed(0)}
+                    {v === cashDue ? t("Exact") : (v / 100).toFixed(0)}
                   </button>
                 ))}
               </div>
@@ -210,12 +212,12 @@ export function PaymentPanel({
                 inputMode="decimal"
                 value={tendered}
                 onChange={(e) => setTendered(e.target.value)}
-                placeholder="Cash received, e.g. 50"
-                aria-label="Cash received"
+                placeholder={t("Cash received, e.g. 50")}
+                aria-label={t("Cash received")}
                 className="num h-12 text-lg"
               />
               {tendered && tSen >= cashDue ? (
-                <p className="num text-right text-lg font-bold">Change {rm(tSen - cashDue)}</p>
+                <p className="num text-right text-lg font-bold">{t("Change {amount}", { amount: rm(tSen - cashDue) })}</p>
               ) : null}
             </div>
           ) : null}
@@ -223,16 +225,20 @@ export function PaymentPanel({
           {method === "duitnow_qr" ? (
             <div className="space-y-2">
               <p className="text-sm text-ink-soft">
-                Customer scans your DuitNow QR at the counter. Check your bank app, then enter the reference.
+                {t("Customer scans your DuitNow QR at the counter. Check your bank app, then enter the reference.")}
               </p>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank reference (last 4–6 digits)" />
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t("Bank reference (last 4–6 digits)")} />
             </div>
           ) : null}
 
           {method === "credit" ? (
             <p className="text-sm text-ink-soft">
-              Charge {rm(order.total)} to {corp?.company || corp?.name || "this company"}. Currently owing {rm(owing)}
-              {corp?.creditLimit ? ` of ${rm(corp.creditLimit)} limit` : ""}.
+              {t("Charge {amount} to {who}. Currently owing {owing}", {
+                amount: rm(order.total),
+                who: corp?.company || corp?.name || t("this company"),
+                owing: rm(owing),
+              })}
+              {corp?.creditLimit ? ` ${t("of {limit} limit", { limit: rm(corp.creditLimit) })}` : ""}.
             </p>
           ) : null}
 
@@ -243,7 +249,11 @@ export function PaymentPanel({
             disabled={busy || (method === "cash" && !!tendered && tSen < cashDue) || (method === "duitnow_qr" && !reference.trim())}
             onClick={pay}
           >
-            {busy ? "Saving…" : method === "credit" ? `Charge ${rm(order.total)}` : `Receive ${rm(method === "cash" ? cashDue : order.total)}`}
+            {busy
+              ? t("Saving…")
+              : method === "credit"
+                ? t("Charge {amount}", { amount: rm(order.total) })
+                : t("Receive {amount}", { amount: rm(method === "cash" ? cashDue : order.total) })}
           </Button>
         </section>
       )}
@@ -253,15 +263,16 @@ export function PaymentPanel({
 }
 
 function Totals({ order }: { order: { subtotal: number; discount: number; serviceCharge: number; sst: number; rounding: number; total: number } }) {
+  const t = useT();
   return (
     <dl className="num space-y-1 border-y border-line py-3 text-sm">
-      <Row k="Subtotal" v={order.subtotal} />
-      {order.discount ? <Row k="Discount" v={-order.discount} /> : null}
-      {order.serviceCharge ? <Row k="Service charge" v={order.serviceCharge} /> : null}
-      {order.sst ? <Row k="SST" v={order.sst} /> : null}
-      {order.rounding ? <Row k="Rounding" v={order.rounding} /> : null}
+      <Row k={t("Subtotal")} v={order.subtotal} />
+      {order.discount ? <Row k={t("Discount")} v={-order.discount} /> : null}
+      {order.serviceCharge ? <Row k={t("Service charge")} v={order.serviceCharge} /> : null}
+      {order.sst ? <Row k={t("SST")} v={order.sst} /> : null}
+      {order.rounding ? <Row k={t("Rounding")} v={order.rounding} /> : null}
       <div className="flex justify-between pt-1 text-xl font-bold">
-        <dt>Total</dt>
+        <dt>{t("Total")}</dt>
         <dd>{rm(order.total)}</dd>
       </div>
     </dl>
@@ -288,6 +299,7 @@ export function OrderControls({
   settled: boolean;
   isOwner: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, start] = useTransition();
   const [error, setError] = useState<string>();
@@ -304,7 +316,7 @@ export function OrderControls({
       <div className="flex flex-wrap gap-2">
         {status === "ready" ? (
           <Button variant="secondary" disabled={busy} onClick={() => run(() => setOrderStatus(orderId, "served"))}>
-            Mark served
+            {t("Mark served")}
           </Button>
         ) : null}
         {!settled && (status === "new" || status === "preparing") ? (
@@ -312,9 +324,9 @@ export function OrderControls({
             variant="secondary"
             className="text-chili"
             disabled={busy}
-            onClick={() => confirm("Cancel this order? The kitchen will stop it.") && run(() => setOrderStatus(orderId, "cancelled"))}
+            onClick={() => confirm(t("Cancel this order? The kitchen will stop it.")) && run(() => setOrderStatus(orderId, "cancelled"))}
           >
-            Cancel order
+            {t("Cancel order")}
           </Button>
         ) : null}
         {settled && isOwner ? (
@@ -323,11 +335,11 @@ export function OrderControls({
             className="text-chili"
             disabled={busy}
             onClick={() => {
-              const reason = prompt("Void the payment? Enter a reason (e.g. refunded, wrong method):");
+              const reason = prompt(t("Void the payment? Enter a reason (e.g. refunded, wrong method):"));
               if (reason) run(() => voidPayment(orderId, reason));
             }}
           >
-            Void payment
+            {t("Void payment")}
           </Button>
         ) : null}
       </div>

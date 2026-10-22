@@ -1,3 +1,5 @@
+import { locale, type Lang } from "@/lib/i18n";
+
 /** Business dates are in Malaysia time (UTC+8, no DST). */
 const OFFSET_MS = 8 * 60 * 60 * 1000;
 
@@ -17,8 +19,8 @@ export function isValidDate(s: string | undefined | null): s is string {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 }
 
-export function fmtTime(d: Date) {
-  return new Intl.DateTimeFormat("en-MY", {
+export function fmtTime(d: Date, lang: Lang = "en") {
+  return new Intl.DateTimeFormat(locale(lang), {
     timeZone: "Asia/Kuala_Lumpur",
     hour: "2-digit",
     minute: "2-digit",
@@ -26,8 +28,8 @@ export function fmtTime(d: Date) {
   }).format(d);
 }
 
-export function fmtDateTime(d: Date) {
-  return new Intl.DateTimeFormat("en-MY", {
+export function fmtDateTime(d: Date, lang: Lang = "en") {
+  return new Intl.DateTimeFormat(locale(lang), {
     timeZone: "Asia/Kuala_Lumpur",
     day: "2-digit",
     month: "short",

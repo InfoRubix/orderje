@@ -3,11 +3,13 @@
 import { keep } from "@/lib/keep-form";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Button, Field, FormError, Input, Select } from "@/components/ui";
+import { useT } from "@/components/i18n";
 import { saveStaff, setStaffActive } from "../actions";
 
 type U = { id: string; name: string; email: string; role: "owner" | "cashier" | "kitchen"; active: boolean };
 
 export function StaffForm({ u, onDone }: { u?: U; onDone?: () => void }) {
+  const t = useT();
   const [state, action, pending] = useActionState(saveStaff, undefined);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -19,24 +21,24 @@ export function StaffForm({ u, onDone }: { u?: U; onDone?: () => void }) {
   return (
     <form ref={ref} onSubmit={keep(action)} className="grid gap-3 sm:grid-cols-2">
       {u ? <input type="hidden" name="id" value={u.id} /> : null}
-      <Field label="Name">
+      <Field label={t("Name")}>
         <Input name="name" defaultValue={u?.name} required />
       </Field>
-      <Field label="Email (login)">
+      <Field label={t("Email (login)")}>
         <Input name="email" type="email" defaultValue={u?.email} required />
       </Field>
-      <Field label="Role">
+      <Field label={t("Role")}>
         <Select name="role" defaultValue={u?.role ?? "cashier"}>
-          <option value="cashier">Cashier</option>
-          <option value="kitchen">Kitchen</option>
-          <option value="owner">Owner (full access)</option>
+          <option value="cashier">{t("Cashier")}</option>
+          <option value="kitchen">{t("Kitchen")}</option>
+          <option value="owner">{t("Owner (full access)")}</option>
         </Select>
       </Field>
-      <Field label={u ? "New password" : "Password"} hint={u ? "Leave blank to keep the current one" : "At least 8 characters"}>
+      <Field label={u ? t("New password") : t("Password")} hint={u ? t("Leave blank to keep the current one") : t("At least 8 characters")}>
         <Input name="password" type="password" autoComplete="new-password" required={!u} minLength={u ? undefined : 8} />
       </Field>
       <div className="flex items-center gap-3 sm:col-span-2">
-        <Button disabled={pending}>{u ? "Save" : "Add staff"}</Button>
+        <Button disabled={pending}>{u ? t("Save") : t("Add staff")}</Button>
         {state?.message && !u ? <span className="text-sm font-semibold text-pandan">{state.message}</span> : null}
         <FormError message={state?.error} />
       </div>
@@ -45,6 +47,7 @@ export function StaffForm({ u, onDone }: { u?: U; onDone?: () => void }) {
 }
 
 export function StaffRow({ u, isMe }: { u: U; isMe: boolean }) {
+  const t = useT();
   const [edit, setEdit] = useState(false);
   const [err, setErr] = useState<string>();
   const [busy, start] = useTransition();
@@ -53,16 +56,16 @@ export function StaffRow({ u, isMe }: { u: U; isMe: boolean }) {
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-semibold">
-            {u.name} {isMe ? <span className="text-sm font-normal text-mute">(you)</span> : null}
+            {u.name} {isMe ? <span className="text-sm font-normal text-mute">({t("you")})</span> : null}
           </p>
           <p className="text-sm text-ink-soft">{u.email}</p>
         </div>
         <Badge tone={u.role === "owner" ? "dark" : "neutral"}>
-          {u.role}
+          {t(u.role)}
         </Badge>
-        {!u.active ? <Badge tone="red">Inactive</Badge> : null}
+        {!u.active ? <Badge tone="red">{t("Inactive")}</Badge> : null}
         <Button size="sm" variant="ghost" onClick={() => setEdit(!edit)}>
-          {edit ? "Close" : "Edit"}
+          {edit ? t("Close") : t("Edit")}
         </Button>
         {!isMe ? (
           <Button
@@ -76,7 +79,7 @@ export function StaffRow({ u, isMe }: { u: U; isMe: boolean }) {
               })
             }
           >
-            {u.active ? "Deactivate" : "Reactivate"}
+            {u.active ? t("Deactivate") : t("Reactivate")}
           </Button>
         ) : null}
       </div>

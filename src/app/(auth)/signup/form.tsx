@@ -4,6 +4,7 @@ import { keep } from "@/lib/keep-form";
 import { useActionState, useState } from "react";
 import { signup } from "../actions";
 import { Button, Field, FormError, Input } from "@/components/ui";
+import { useT } from "@/components/i18n";
 
 const toSlug = (s: string) =>
   s
@@ -14,6 +15,7 @@ const toSlug = (s: string) =>
 
 export function SignupForm() {
   const [state, action, pending] = useActionState(signup, undefined);
+  const t = useT();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
@@ -21,7 +23,7 @@ export function SignupForm() {
   return (
     <form onSubmit={keep(action)} className="mt-6 space-y-4">
       <FormError message={state?.error} />
-      <Field label="Kedai name">
+      <Field label={t("Kedai name")}>
         <Input
           name="shopName"
           required
@@ -33,7 +35,7 @@ export function SignupForm() {
           }}
         />
       </Field>
-      <Field label="Menu link name" hint={`Customers' menu lives at /t/${slug || "your-kedai"}/…`}>
+      <Field label={t("Menu link name")} hint={t("Customers' menu lives at {path}", { path: `/t/${slug || "your-kedai"}/…` })}>
         <Input
           name="slug"
           required
@@ -44,24 +46,24 @@ export function SignupForm() {
           }}
         />
       </Field>
-      <Field label="Your name">
+      <Field label={t("Your name")}>
         <Input name="ownerName" required autoComplete="name" />
       </Field>
-      <Field label="Email">
+      <Field label={t("Email")}>
         <Input name="email" type="email" required autoComplete="email" />
       </Field>
-      <Field label="Password" hint="At least 8 characters">
+      <Field label={t("Password")} hint={t("At least 8 characters")}>
         <Input name="password" type="password" required minLength={8} autoComplete="new-password" />
       </Field>
-      <Field label="How many tables?" hint="Each table gets its own QR code. Add more anytime.">
+      <Field label={t("How many tables?")} hint={t("Each table gets its own QR code. Add more anytime.")}>
         <Input name="tables" type="number" min={0} max={200} defaultValue={10} />
       </Field>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="sample" defaultChecked className="size-4 accent-pandan" />
-        Start with a sample mamak menu
+        {t("Start with a sample mamak menu")}
       </label>
       <Button className="w-full" size="lg" disabled={pending}>
-        {pending ? "Creating…" : "Create kedai"}
+        {pending ? t("Creating…") : t("Create kedai")}
       </Button>
     </form>
   );

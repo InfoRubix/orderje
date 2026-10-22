@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, ChefHat, Clock, HandPlatter, XCircle } from "lucide-react";
 import type { OrderStatus } from "@/db/schema";
+import { makeT } from "@/lib/i18n";
 import { getOrderByToken } from "@/lib/orders";
 import { getTenant } from "@/lib/repo";
 import { rm } from "@/lib/money";
@@ -12,7 +13,12 @@ import { brandStyle } from "@/lib/brand";
 import { ShopLogo } from "@/components/thumb";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Your order" };
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const order = await getOrderByToken(token);
+  const tenant = order ? await getTenant(order.tenantId) : undefined;
+  return { title: makeT(tenant?.language ?? "en")("Your order") };
+}
 
 const STEPS: { key: OrderStatus; label: string; icon: typeof Clock }[] = [
   { key: "new", label: "Received", icon: Clock },
@@ -27,6 +33,7 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
   if (!order) notFound();
   const tenant = await getTenant(order.tenantId);
   if (!tenant) notFound();
+  const t = makeT(tenant.language);
   const stepIdx = STEPS.findIndex((s) => s.key === order.status);
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
   const done = order.status === "cancelled" || (order.status === "served" && settled);
@@ -39,9 +46,9 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
           <ShopLogo name={tenant.name} src={tenant.logoUrl} className="size-7 rounded-md text-sm" />
           {tenant.name}
         </p>
-        <h1 className="mt-1 font-display text-5xl">Order #{order.orderNo}</h1>
+        <h1 className="mt-1 font-display text-5xl">{t("Order #{n}", { n: order.orderNo })}</h1>
         <p className="mt-1 opacity-85">
-          {ORDER_TYPE_LABEL[order.orderType]}
+          {t(ORDER_TYPE_LABEL[order.orderType])}
           {order.tableLabel ? `, ${order.tableLabel}` : ""}
           {order.customerName ? `, ${order.customerName}` : ""}
         </p>
@@ -51,10 +58,10 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
         {order.status === "cancelled" ? (
           <div className="flex items-center gap-3 rounded-xl bg-chili-soft p-4 text-chili">
             <XCircle className="size-6 shrink-0" aria-hidden />
-            <p className="font-semibold">This order was cancelled by the kedai. Please check with the counter.</p>
+            <p className="font-semibold">{t("This order was cancelled by the kedai. Please check with the counter.")}</p>
           </div>
         ) : (
-          <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
+          <ol className="grid grid-cols-4 gap-2" aria-label={t("Order progress")}>
             {STEPS.map((s, i) => {
               const Icon = s.icon;
               const reached = i <= stepIdx;
@@ -70,7 +77,7 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
                     <Icon className="size-5" aria-hidden />
                   </span>
                   <span className={cn("mt-1.5 block text-xs font-semibold", reached ? "text-ink" : "text-mute")}>
-                    {s.label}
+                    {t(s.label)}
                   </span>
                 </li>
               );
@@ -93,13 +100,13 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
             ))}
           </ul>
           <dl className="num mt-3 space-y-1 border-t border-dashed border-line pt-3 text-sm">
-            <Line label="Subtotal" v={order.subtotal} />
-            {order.discount ? <Line label="Discount" v={-order.discount} /> : null}
-            {order.serviceCharge ? <Line label="Service charge" v={order.serviceCharge} /> : null}
-            {order.sst ? <Line label="SST" v={order.sst} /> : null}
-            {order.rounding ? <Line label="Rounding" v={order.rounding} /> : null}
+            <Line label={t("Subtotal")} v={order.subtotal} />
+            {order.discount ? <Line label={t("Discount")} v={-order.discount} /> : null}
+            {order.serviceCharge ? <Line label={t("Service charge")} v={order.serviceCharge} /> : null}
+            {order.sst ? <Line label={t("SST")} v={order.sst} /> : null}
+            {order.rounding ? <Line label={t("Rounding")} v={order.rounding} /> : null}
             <div className="flex justify-between pt-1 text-lg font-bold">
-              <dt>Total</dt>
+              <dt>{t("Total")}</dt>
               <dd>{rm(order.total)}</dd>
             </div>
           </dl>
@@ -109,24 +116,24 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
           settled ? (
             <div className="rounded-xl border border-pandan/30 bg-pandan-soft p-4">
               <p className="font-semibold text-pandan-dark">
-                {order.paymentStatus === "credit" ? "Charged to your company account." : "Paid. Terima kasih!"}
+                {order.paymentStatus === "credit" ? t("Charged to your company account.") : t("Paid. Terima kasih!")}
               </p>
               <Link href={`/r/${order.publicToken}`} className="mt-1 inline-block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
-                View receipt
+                {t("View receipt")}
               </Link>
             </div>
           ) : (
             <div className="rounded-xl border-2 border-edge bg-surface p-5 text-center">
-              <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">Please pay at the counter</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">{t("Please pay at the counter")}</p>
               <p className="num font-display tag mt-2 text-5xl">{rm(order.total)}</p>
               <p className="mt-1 text-sm text-ink-soft">
-                Cash or DuitNow QR. Show order #{order.orderNo} to the cashier.
+                {t("Cash or DuitNow QR. Show order #{n} to the cashier.", { n: order.orderNo })}
               </p>
             </div>
           )
         ) : null}
 
-        <p className="text-center text-xs text-mute">Keep this page open. It updates by itself.</p>
+        <p className="text-center text-xs text-mute">{t("Keep this page open. It updates by itself.")}</p>
       </div>
     </main>
   );

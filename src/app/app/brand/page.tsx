@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { makeT } from "@/lib/i18n";
 import { listMenuItems } from "@/lib/orders";
 import { buttonVariants, PageHeader } from "@/components/ui";
 import { BrandForm } from "./form";
@@ -7,20 +8,21 @@ export const metadata = { title: "Brand & profile" };
 
 export default async function BrandPage() {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const items = (await listMenuItems(tenant.id)).filter((i) => i.available).slice(0, 3);
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Brand & profile"
-        sub="How your kedai looks to customers on the QR menu, order page and receipts."
+        title={t("Brand & profile")}
+        sub={t("How your kedai looks to customers on the QR menu, order page and receipts.")}
         actions={
           <a href={`/t/${tenant.slug}/takeaway`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "secondary" })}>
-            See it on the customer phone
+            {t("See it on the customer phone")}
           </a>
         }
       />
       <BrandForm
-        t={{
+        brand={{
           name: tenant.name,
           tagline: tenant.tagline ?? "",
           address: tenant.address ?? "",

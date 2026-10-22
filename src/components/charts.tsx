@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { rm } from "@/lib/money";
+import { useT } from "@/components/i18n";
 
 /**
  * Single-series bar chart (magnitude = one hue). Hover/focus shows a tooltip;
@@ -16,6 +17,7 @@ export function BarChart({
   label: string;
   height?: number;
 }) {
+  const t = useT();
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => d.value));
   const nice = niceMax(max);
@@ -78,7 +80,7 @@ export function BarChart({
         </div>
       </div>
       <figcaption className="sr-only">
-        {label}. Highest: {data[peak]?.label} at {rm(data[peak]?.value ?? 0)}.
+        {label}. {t("Highest: {label} at {amount}.", { label: data[peak]?.label ?? "", amount: rm(data[peak]?.value ?? 0) })}
       </figcaption>
       <table className="sr-only">
         <tbody>

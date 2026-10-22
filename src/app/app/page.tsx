@@ -6,6 +6,7 @@ import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { isValidDate, myDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { makeT } from "@/lib/i18n";
 import { Card, PageHeader } from "@/components/ui";
 import { BarChart } from "@/components/charts";
 import { Breakdown } from "@/components/breakdown";
@@ -28,6 +29,7 @@ const PRESETS = [
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string; from?: string; to?: string }> }) {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const sp = await searchParams;
   const today = myDate();
   let from = today;
@@ -61,7 +63,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <div className="max-w-6xl">
       <PageHeader
         title={tenant.name}
-        sub={multiDay ? `${from} to ${to}` : from === today ? "Today so far" : from}
+        sub={multiDay ? t("{from} to {to}", { from, to }) : from === today ? t("Today so far") : from}
         actions={
           <div className="flex flex-wrap gap-1 rounded-lg bg-surface p-1 ring-1 ring-line">
             {PRESETS.map((p) => (
@@ -73,14 +75,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   range === p.key ? "bg-ink text-on-ink" : "text-ink-soft hover:text-ink",
                 )}
               >
-                {p.label}
+                {t(p.label)}
               </Link>
             ))}
             <form className="flex items-center gap-1 pl-1">
               <input type="hidden" name="range" value="custom" />
-              <input type="date" name="from" defaultValue={from} max={today} aria-label="From" className="h-8 rounded-md border border-line px-2 text-sm" />
-              <input type="date" name="to" defaultValue={to} max={today} aria-label="To" className="h-8 rounded-md border border-line px-2 text-sm" />
-              <button className="h-8 rounded-md px-2 text-sm font-semibold text-pandan">Go</button>
+              <input type="date" name="from" defaultValue={from} max={today} aria-label={t("From")} className="h-8 rounded-md border border-line px-2 text-sm" />
+              <input type="date" name="to" defaultValue={to} max={today} aria-label={t("To")} className="h-8 rounded-md border border-line px-2 text-sm" />
+              <button className="h-8 rounded-md px-2 text-sm font-semibold text-pandan">{t("Go")}</button>
             </form>
           </div>
         }
@@ -92,54 +94,59 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           className="mb-5 flex items-center justify-between rounded-xl border-2 border-edge bg-tag px-4 py-3 text-sm font-bold text-on-tag"
         >
           <span>
-            {open.n} bill{open.n === 1 ? "" : "s"} still unpaid
+            {t(open.n === 1 ? "{n} bill still unpaid" : "{n} bills still unpaid", { n: open.n })}
           </span>
-          <span className="underline">Open counter</span>
+          <span className="underline">{t("Open counter")}</span>
         </Link>
       ) : null}
 
       <div className="mb-6 grid gap-0.5 overflow-hidden rounded-xl border-2 border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-[#24211d] p-5 text-white">
-          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Sales</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-white/70">{t("Sales")}</p>
           <p className="num font-display text-5xl text-cream">{rm(r.sales)}</p>
           <p className="mt-1 text-sm text-white/70">
-            {r.orders} paid order{r.orders === 1 ? "" : "s"}
+            {t(r.orders === 1 ? "{n} paid order" : "{n} paid orders", { n: r.orders })}
           </p>
         </div>
-        <Stat label="Average bill" value={rm(avg)} />
-        <Stat label="Money in hand" value={rm(collected)} sub={r.byMethod.credit ? `+ ${rm(r.byMethod.credit.total)} on credit` : "Cash and DuitNow QR"} />
+        <Stat label={t("Average bill")} value={rm(avg)} />
         <Stat
-          label="Discounts given"
+          label={t("Money in hand")}
+          value={rm(collected)}
+          sub={r.byMethod.credit ? t("+ {amount} on credit", { amount: rm(r.byMethod.credit.total) }) : t("Cash and DuitNow QR")}
+        />
+        <Stat
+          label={t("Discounts given")}
           value={rm(r.discount)}
-          sub={r.cancelled.n ? `${r.cancelled.n} cancelled (${rm(r.cancelled.total)})` : "No cancellations"}
+          sub={r.cancelled.n ? t("{n} cancelled ({amount})", { n: r.cancelled.n, amount: rm(r.cancelled.total) }) : t("No cancellations")}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-5 lg:col-span-2">
-          <h2 className="mb-4 font-display text-lg font-bold">{multiDay ? "Sales by day" : "Sales by hour"}</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{multiDay ? t("Sales by day") : t("Sales by hour")}</h2>
           {multiDay ? (
             <BarChart
-              label="Sales by day"
+              label={t("Sales by day")}
               data={days.map((d) => {
                 const row = r.byDay.find((x) => x.d === d);
-                return { key: d, label: d.slice(8) + "/" + d.slice(5, 7), value: row?.total ?? 0, sub: `${row?.n ?? 0} orders` };
+                return { key: d, label: d.slice(8) + "/" + d.slice(5, 7), value: row?.total ?? 0, sub: t("{n} orders", { n: row?.n ?? 0 }) };
               })}
             />
           ) : (
             <BarChart
-              label="Sales by hour"
-              data={hours.map((h) => ({ key: String(h.h), label: hourLabel(h.h), value: h.total, sub: `${h.n} orders` }))}
+              label={t("Sales by hour")}
+              data={hours.map((h) => ({ key: String(h.h), label: hourLabel(h.h), value: h.total, sub: t("{n} orders", { n: h.n }) }))}
             />
           )}
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Payment method</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{t("Payment method")}</h2>
           <Breakdown
+            empty={t("No sales in this period.")}
             total={r.sales}
             rows={(["cash", "duitnow_qr", "credit"] as const).map((m) => ({
-              label: METHOD_LABEL[m],
+              label: t(METHOD_LABEL[m]),
               value: r.byMethod[m]?.total ?? 0,
               n: r.byMethod[m]?.n ?? 0,
             }))}
@@ -147,11 +154,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Customer type</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{t("Customer type")}</h2>
           <Breakdown
+            empty={t("No sales in this period.")}
             total={r.sales}
             rows={(["walk_in", "member", "staff", "corporate"] as const).map((k) => ({
-              label: CUSTOMER_TYPE_LABEL[k],
+              label: t(CUSTOMER_TYPE_LABEL[k]),
               value: r.byCustomer[k]?.total ?? 0,
               n: r.byCustomer[k]?.n ?? 0,
             }))}
@@ -159,36 +167,38 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Order type</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{t("Order type")}</h2>
           <Breakdown
+            empty={t("No sales in this period.")}
             total={r.sales}
             rows={(["dine_in", "takeaway", "delivery"] as const).map((k) => ({
-              label: ORDER_TYPE_LABEL[k],
+              label: t(ORDER_TYPE_LABEL[k]),
               value: r.byType[k]?.total ?? 0,
               n: r.byType[k]?.n ?? 0,
             }))}
           />
-          <h3 className="mb-3 mt-6 text-sm font-semibold text-ink-soft">Where orders came from</h3>
+          <h3 className="mb-3 mt-6 text-sm font-semibold text-ink-soft">{t("Where orders came from")}</h3>
           <Breakdown
+            empty={t("No sales in this period.")}
             total={r.sales}
             rows={[
-              { label: "Customer scanned QR", value: r.bySource.qr?.total ?? 0, n: r.bySource.qr?.n ?? 0 },
-              { label: "Keyed in at counter", value: r.bySource.counter?.total ?? 0, n: r.bySource.counter?.n ?? 0 },
+              { label: t("Customer scanned QR"), value: r.bySource.qr?.total ?? 0, n: r.bySource.qr?.n ?? 0 },
+              { label: t("Keyed in at counter"), value: r.bySource.counter?.total ?? 0, n: r.bySource.counter?.n ?? 0 },
             ]}
           />
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Best sellers</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{t("Best sellers")}</h2>
           {r.topItems.length === 0 ? (
-            <p className="text-sm text-mute">No sales in this period.</p>
+            <p className="text-sm text-mute">{t("No sales in this period.")}</p>
           ) : (
             <ol className="divide-y divide-line">
               {r.topItems.map((it, i) => (
                 <li key={it.name} className="flex items-center gap-3 py-2 text-sm">
                   <span className="num w-5 text-mute">{i + 1}</span>
                   <span className="flex-1 font-medium">{it.name}</span>
-                  <span className="num text-ink-soft">{it.qty} sold</span>
+                  <span className="num text-ink-soft">{t("{n} sold", { n: it.qty })}</span>
                   <span className="num w-24 text-right font-semibold">{rm(it.total)}</span>
                 </li>
               ))}
@@ -197,19 +207,19 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-lg font-bold">Tax & charges collected</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{t("Tax & charges collected")}</h2>
           <dl className="num space-y-2 text-sm">
-            <Row k="Item sales (before discount)" v={r.subtotal} />
-            <Row k="Discounts" v={-r.discount} />
-            <Row k="Service charge" v={r.service} />
-            <Row k="SST" v={r.sst} />
+            <Row k={t("Item sales (before discount)")} v={r.subtotal} />
+            <Row k={t("Discounts")} v={-r.discount} />
+            <Row k={t("Service charge")} v={r.service} />
+            <Row k={t("SST")} v={r.sst} />
             <div className="flex justify-between border-t border-line pt-2 font-bold">
-              <dt>Total sales</dt>
+              <dt>{t("Total sales")}</dt>
               <dd>{rm(r.sales)}</dd>
             </div>
           </dl>
           <Link href={`/app/recon?date=${to}`} className="mt-4 inline-block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
-            Reconcile {to === today ? "today" : to}
+            {to === today ? t("Reconcile today") : t("Reconcile {date}", { date: to })}
           </Link>
         </Card>
       </div>

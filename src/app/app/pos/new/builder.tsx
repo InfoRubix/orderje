@@ -8,6 +8,7 @@ import { computeTotals, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { rm } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button, FormError, Input, Select } from "@/components/ui";
+import { useT } from "@/components/i18n";
 import { createCounterOrder } from "../../actions";
 
 type Line = { key: string; item: MenuItemFull; qty: number; optionIds: string[]; note: string };
@@ -29,6 +30,7 @@ export function CounterOrder({
   defaultTable?: string;
   rates: Parameters<typeof computeTotals>[0];
 }) {
+  const t = useT();
   const router = useRouter();
   const [cat, setCat] = useState(menu[0]?.id);
   const [lines, setLines] = useState<Line[]>([]);
@@ -72,7 +74,7 @@ export function CounterOrder({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <section>
-        <h1 className="mb-4 font-display text-2xl font-bold md:text-3xl">New order</h1>
+        <h1 className="mb-4 font-display text-2xl font-bold md:text-3xl">{t("New order")}</h1>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {menu.map((c) => (
             <button
@@ -87,7 +89,7 @@ export function CounterOrder({
             </button>
           ))}
         </div>
-        {menu.length === 0 ? <p className="text-ink-soft">No menu items yet. Add some under Menu.</p> : null}
+        {menu.length === 0 ? <p className="text-ink-soft">{t("No menu items yet. Add some under Menu.")}</p> : null}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
             <button
@@ -98,7 +100,7 @@ export function CounterOrder({
               <span className="font-semibold leading-snug">{item.name}</span>
               <span className="num mt-2 text-sm font-semibold text-pandan-dark">
                 {rm(item.price)}
-                {item.groups.length ? <span className="ml-1 font-normal text-mute">+ options</span> : null}
+                {item.groups.length ? <span className="ml-1 font-normal text-mute">{t("+ options")}</span> : null}
               </span>
             </button>
           ))}
@@ -108,27 +110,27 @@ export function CounterOrder({
       <aside className="h-fit rounded-xl border-2 border-edge bg-surface lg:sticky lg:top-6">
         <div className="border-b border-line p-4">
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-paper p-1">
-            {(["dine_in", "takeaway", "delivery"] as const).map((t) => (
+            {(["dine_in", "takeaway", "delivery"] as const).map((k) => (
               <button
-                key={t}
-                onClick={() => setOrderType(t)}
+                key={k}
+                onClick={() => setOrderType(k)}
                 className={cn(
                   "rounded-md py-1.5 text-sm font-semibold",
-                  orderType === t ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
+                  orderType === k ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
                 )}
-                aria-pressed={orderType === t}
+                aria-pressed={orderType === k}
               >
-                {ORDER_TYPE_LABEL[t]}
+                {t(ORDER_TYPE_LABEL[k])}
               </button>
             ))}
           </div>
           <div className="mt-3 space-y-2">
             {orderType === "dine_in" ? (
-              <Select value={tableId} onChange={(e) => setTableId(e.target.value)} aria-label="Table">
-                <option value="">Pick a table…</option>
-                {tables.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
+              <Select value={tableId} onChange={(e) => setTableId(e.target.value)} aria-label={t("Table")}>
+                <option value="">{t("Pick a table…")}</option>
+                {tables.map((tb) => (
+                  <option key={tb.id} value={tb.id}>
+                    {tb.label}
                   </option>
                 ))}
               </Select>
@@ -136,16 +138,16 @@ export function CounterOrder({
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={orderType === "delivery" ? "Customer / rider (e.g. Grab #123)" : "Customer name (optional)"}
+              placeholder={orderType === "delivery" ? t("Customer / rider (e.g. Grab #123)") : t("Customer name (optional)")}
             />
             {orderType !== "dine_in" ? (
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone (optional)" inputMode="tel" />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("Phone (optional)")} inputMode="tel" />
             ) : null}
           </div>
         </div>
 
         <ul className="max-h-[40vh] divide-y divide-line overflow-y-auto">
-          {lines.length === 0 ? <li className="p-6 text-center text-sm text-mute">Tap items to add them.</li> : null}
+          {lines.length === 0 ? <li className="p-6 text-center text-sm text-mute">{t("Tap items to add them.")}</li> : null}
           {lines.map((l) => (
             <li key={l.key} className="flex items-start gap-2 px-4 py-2.5">
               <div className="min-w-0 flex-1">
@@ -157,7 +159,7 @@ export function CounterOrder({
               <div className="flex items-center">
                 <button
                   className="grid size-8 place-items-center rounded text-ink-soft hover:bg-paper"
-                  aria-label="Less"
+                  aria-label={t("Less")}
                   onClick={() => setLines((c) => c.flatMap((x) => (x.key !== l.key ? [x] : x.qty > 1 ? [{ ...x, qty: x.qty - 1 }] : [])))}
                 >
                   {l.qty > 1 ? <Minus className="size-4" /> : <Trash2 className="size-4" />}
@@ -165,7 +167,7 @@ export function CounterOrder({
                 <span className="num w-6 text-center font-bold">{l.qty}</span>
                 <button
                   className="grid size-8 place-items-center rounded text-ink-soft hover:bg-paper"
-                  aria-label="More"
+                  aria-label={t("More")}
                   onClick={() => setLines((c) => c.map((x) => (x.key === l.key ? { ...x, qty: Math.min(99, x.qty + 1) } : x)))}
                 >
                   <Plus className="size-4" />
@@ -176,33 +178,33 @@ export function CounterOrder({
         </ul>
 
         <div className="space-y-3 border-t border-line p-4">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Order note" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Order note")} />
           <dl className="num space-y-1 text-sm">
             <div className="flex justify-between text-ink-soft">
-              <dt>Subtotal</dt>
+              <dt>{t("Subtotal")}</dt>
               <dd>{rm(totals.subtotal)}</dd>
             </div>
             {totals.serviceCharge ? (
               <div className="flex justify-between text-ink-soft">
-                <dt>Service charge</dt>
+                <dt>{t("Service charge")}</dt>
                 <dd>{rm(totals.serviceCharge)}</dd>
               </div>
             ) : null}
             {totals.sst ? (
               <div className="flex justify-between text-ink-soft">
-                <dt>SST</dt>
+                <dt>{t("SST")}</dt>
                 <dd>{rm(totals.sst)}</dd>
               </div>
             ) : null}
             <div className="flex justify-between text-lg font-bold">
-              <dt>Total</dt>
+              <dt>{t("Total")}</dt>
               <dd>{rm(totals.total)}</dd>
             </div>
           </dl>
-          <p className="text-xs text-mute">Member, staff or corporate pricing is applied on the payment screen.</p>
+          <p className="text-xs text-mute">{t("Member, staff or corporate pricing is applied on the payment screen.")}</p>
           <FormError message={error} />
           <Button size="xl" className="w-full" disabled={busy || lines.length === 0} onClick={submit}>
-            {busy ? "Sending…" : "Send to kitchen & bill"}
+            {busy ? t("Sending…") : t("Send to kitchen & bill")}
           </Button>
         </div>
       </aside>
@@ -230,6 +232,7 @@ function OptionsDialog({
   onClose: () => void;
   onAdd: (ids: string[], qty: number, note: string) => void;
 }) {
+  const t = useT();
   const [ids, setIds] = useState<string[]>([]);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState("");
@@ -246,11 +249,11 @@ function OptionsDialog({
   };
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal aria-label={item.name}>
-      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
+      <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label={t("Close")} />
       <div className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5">
         <div className="mb-4 flex items-start justify-between">
           <h2 className="font-display text-xl font-bold">{item.name}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1 text-ink-soft">
+          <button onClick={onClose} aria-label={t("Close")} className="p-1 text-ink-soft">
             <X className="size-5" />
           </button>
         </div>
@@ -258,7 +261,7 @@ function OptionsDialog({
           {item.groups.map((g) => (
             <div key={g.id}>
               <p className="mb-2 text-sm font-semibold">
-                {g.name} <span className="font-normal text-mute">{g.required ? "(required)" : "(optional)"}</span>
+                {g.name} <span className="font-normal text-mute">{g.required ? t("(required)") : t("(optional)")}</span>
               </p>
               <div className="flex flex-wrap gap-2">
                 {g.options.map((o) => (
@@ -278,19 +281,19 @@ function OptionsDialog({
               </div>
             </div>
           ))}
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Kitchen note" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Kitchen note")} />
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-md border-2 border-edge">
-              <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Less">
+              <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={t("Less")}>
                 <Minus className="size-4" />
               </button>
               <span className="num w-6 text-center font-bold">{qty}</span>
-              <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label="More">
+              <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label={t("More")}>
                 <Plus className="size-4" />
               </button>
             </div>
             <Button size="lg" className="flex-1" disabled={!!missing} onClick={() => onAdd(ids, qty, note.trim())}>
-              {missing ? `Choose ${missing.name}` : `Add · ${rm(unit(item, ids) * qty)}`}
+              {missing ? t("Choose {name}", { name: missing.name }) : t("Add · {amount}", { amount: rm(unit(item, ids) * qty) })}
             </Button>
           </div>
         </div>

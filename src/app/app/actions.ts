@@ -20,6 +20,7 @@ import {
   type User,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { isLang, makeT, translate, UserError, type Lang } from "@/lib/i18n";
 import {
   createOrder,
   getOrderRow,
@@ -43,24 +44,25 @@ async function assertOpenToday(tenantId: string) {
 }
 
 /** Turns any failure into a message the screen can show, so nothing ever fails silently. */
-function fail(e: unknown): ActionResult {
-  if (e instanceof OrderError) return { error: e.message };
-  if (e instanceof z.ZodError) return { error: e.issues[0]?.message ?? "Check the form." };
+function fail(e: unknown, lang: Lang): ActionResult {
+  const t = makeT(lang);
+  if (e instanceof UserError) return { error: e.in(lang) };
+  if (e instanceof z.ZodError) return { error: t(e.issues[0]?.message ?? "Check the form.") };
   unstable_rethrow(e); // let Next.js redirects and not-found through
   console.error(e);
-  return { error: "Something went wrong and nothing was saved. Please try again." };
+  return { error: t("Something went wrong and nothing was saved. Please try again.") };
 }
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const bool = (f: FormData, k: string) => f.get(k) === "on" || f.get(k) === "true";
 function sen(f: FormData, k: string, label: string, allowZero = true) {
   const v = toSen(str(f, k) || "0");
-  if (!Number.isFinite(v) || v < 0 || (!allowZero && v === 0)) throw new OrderError(`Enter a valid amount for ${label}.`);
+  if (!Number.isFinite(v) || v < 0 || (!allowZero && v === 0)) throw new OrderError("Enter a valid amount for {label}.", { label });
   return v;
 }
 function rate(f: FormData, k: string, label: string) {
   const n = Number(str(f, k) || "0");
-  if (!Number.isFinite(n) || n < 0 || n > 100) throw new OrderError(`${label} must be between 0 and 100%.`);
+  if (!Number.isFinite(n) || n < 0 || n > 100) throw new OrderError("{label} must be between 0 and 100%.", { label });
   return Math.round(n * 100);
 }
 
@@ -76,13 +78,14 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
 
 export async function setOrderStatus(orderId: string, status: OrderStatus): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner", "cashier", "kitchen"]);
+  const t = makeT(tenant.language);
   const o = await getOrderRow(tenant.id, orderId);
-  if (!o) return { error: "Order not found." };
-  if (!NEXT[o.status].includes(status)) return { error: `Can't move a ${o.status} order to ${status}.` };
+  if (!o) return { error: t("Order not found.") };
+  if (!NEXT[o.status].includes(status)) return { error: t("Can't move a {from} order to {to}.", { from: t(o.status), to: t(status) }) };
   if (status === "cancelled") {
-    if (user.role === "kitchen") return { error: "Only the counter can cancel orders." };
+    if (user.role === "kitchen") return { error: t("Only the counter can cancel orders.") };
     if (o.paymentStatus === "paid" || o.paymentStatus === "credit")
-      return { error: "This order is paid. Refund it at the counter first." };
+      return { error: t("This order is paid. Refund it at the counter first.") };
   }
   const orderRef = col.of(tenant.id, "orders").doc(o.id);
   try {
@@ -94,7 +97,7 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
       tx.update(orderRef, { status });
     });
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
   revalidatePath("/app/pos");
   revalidatePath(`/app/orders/${o.id}`);
@@ -122,9 +125,10 @@ const counterOrderSchema = z.object({
 
 export async function createCounterOrder(input: z.infer<typeof counterOrderSchema>): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   try {
     const d = counterOrderSchema.parse(input);
-    if (d.orderType === "dine_in" && !d.tableId) return { error: "Pick a table for dine-in, or switch to takeaway." };
+    if (d.orderType === "dine_in" && !d.tableId) return { error: t("Pick a table for dine-in, or switch to takeaway.") };
     const o = await createOrder({
       tenantId: tenant.id,
       source: "counter",
@@ -138,7 +142,7 @@ export async function createCounterOrder(input: z.infer<typeof counterOrderSchem
     revalidatePath("/app/pos");
     return { ok: true, id: o.id };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
@@ -149,7 +153,7 @@ export async function changeOrderCustomer(orderId: string, type: CustomerType, c
     revalidatePath(`/app/orders/${orderId}`);
     return { ok: true };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
@@ -160,27 +164,29 @@ export async function takePayment(
   reference: string,
 ): Promise<{ ok?: boolean; error?: string; change?: number | null }> {
   const { user, tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   try {
     await assertOpenToday(tenant.id);
     const tSen = method === "cash" && tendered ? toSen(tendered) : undefined;
-    if (tSen !== undefined && !Number.isFinite(tSen)) return { error: "Enter the cash received as a number, e.g. 20 or 20.50." };
+    if (tSen !== undefined && !Number.isFinite(tSen)) return { error: t("Enter the cash received as a number, e.g. 20 or 20.50.") };
     const r = await payAtCounter({ tenant, orderId, method, tenderedSen: tSen, reference, userId: user.id });
     revalidatePath(`/app/orders/${orderId}`);
     revalidatePath("/app/pos");
     return { ok: true, change: r.changeGiven };
   } catch (e) {
-    return fail(e) ?? {};
+    return fail(e, tenant.language) ?? {};
   }
 }
 
 /** Reverses a paid order (refund handed back at the counter) so it can be cancelled or re-paid. */
 export async function voidPayment(orderId: string, reason: string): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner"]);
-  if (!reason.trim()) return { error: "Give a reason for the void." };
+  const t = makeT(tenant.language);
+  if (!reason.trim()) return { error: t("Give a reason for the void.") };
   const o = await getOrderRow(tenant.id, orderId);
-  if (!o || (o.paymentStatus !== "paid" && o.paymentStatus !== "credit")) return { error: "Nothing to void." };
+  if (!o || (o.paymentStatus !== "paid" && o.paymentStatus !== "credit")) return { error: t("Nothing to void.") };
   const date = myDate(o.paidAt ?? o.createdAt);
-  if (await isDayClosed(tenant.id, date)) return { error: `${date} is already closed in Recon. Reopen that day first.` };
+  if (await isDayClosed(tenant.id, date)) return { error: t("{date} is already closed in Recon. Reopen that day first.", { date }) };
   const orderRef = col.of(tenant.id, "orders").doc(o.id);
   try {
     await fs().runTransaction(async (tx) => {
@@ -192,7 +198,7 @@ export async function voidPayment(orderId: string, reason: string): Promise<Acti
       tx.update(orderRef, { paymentStatus: "unpaid", paidMethod: null, paidAt: null, total: fresh.total - fresh.rounding, rounding: 0 });
     });
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
   revalidatePath(`/app/orders/${orderId}`);
   return { ok: true };
@@ -202,8 +208,9 @@ export async function voidPayment(orderId: string, reason: string): Promise<Acti
 
 export async function addCategory(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const name = str(f, "name").slice(0, 40);
-  if (!name) return { error: "Enter a category name." };
+  if (!name) return { error: t("Enter a category name.") };
   const cats = col.of(tenant.id, "categories");
   const existing = await listCategories(tenant.id);
   await cats.doc(uid()).create({ tenantId: tenant.id, name, sort: (existing.at(-1)?.sort ?? -1) + 1 });
@@ -213,10 +220,11 @@ export async function addCategory(_: ActionResult, f: FormData): Promise<ActionR
 
 export async function renameCategory(id: string, name: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const clean = name.trim().slice(0, 40);
-  if (!clean) return { error: "Enter a category name." };
+  if (!clean) return { error: t("Enter a category name.") };
   const ref = col.of(tenant.id, "categories").doc(id);
-  if (!(await ref.get()).exists) return { error: "Category not found." };
+  if (!(await ref.get()).exists) return { error: t("Category not found.") };
   await ref.update({ name: clean });
   revalidatePath("/app/menu");
   return { ok: true };
@@ -279,15 +287,16 @@ export type ItemInput = z.infer<typeof itemSchema>;
  */
 export async function saveItem(f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const d = itemSchema.parse(JSON.parse(String(f.get("data") ?? "{}")));
     const price = toSen(d.price);
-    if (!Number.isFinite(price) || price <= 0) return { error: "Enter a price, e.g. 8.50." };
-    if (!(await col.of(tenant.id, "categories").doc(d.categoryId).get()).exists) return { error: "Pick a category." };
+    if (!Number.isFinite(price) || price <= 0) return { error: t("Enter a price, e.g. 8.50.") };
+    if (!(await col.of(tenant.id, "categories").doc(d.categoryId).get()).exists) return { error: t("Pick a category.") };
     const items = col.of(tenant.id, "menuItems");
     const id = d.id || uid();
     const existing = d.id ? read<MenuItem>(await items.doc(d.id).get()) : undefined;
-    if (d.id && !existing) return { error: "Item not found." };
+    if (d.id && !existing) return { error: t("Item not found.") };
 
     const groups: ModifierGroup[] = d.groups.map((g, gi) => {
       const groupId = uid();
@@ -300,7 +309,7 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
         sort: gi,
         options: g.options.map((o, oi) => {
           const p = o.price.trim() ? toSen(o.price) : 0;
-          if (!Number.isFinite(p) || p < 0) throw new OrderError(`Check the extra price for ${o.name}.`);
+          if (!Number.isFinite(p) || p < 0) throw new OrderError("Check the extra price for {name}.", { name: o.name });
           return { id: uid(), groupId, name: o.name, price: p, sort: oi };
         }),
       };
@@ -332,16 +341,17 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
       await items.doc(id).create(item);
     }
     revalidatePath("/app/menu");
-    return { ok: true, id, message: existing ? `${d.name} saved` : `${d.name} added to the menu` };
+    return { ok: true, id, message: existing ? t("{name} saved", { name: d.name }) : t("{name} added to the menu", { name: d.name }) };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
 export async function toggleAvailable(id: string, available: boolean): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   const ref = col.of(tenant.id, "menuItems").doc(id);
-  if (!(await ref.get()).exists) return { error: "Item not found." };
+  if (!(await ref.get()).exists) return { error: t("Item not found.") };
   await ref.update({ available });
   revalidatePath("/app/menu");
   return { ok: true };
@@ -349,13 +359,14 @@ export async function toggleAvailable(id: string, available: boolean): Promise<A
 
 export async function deleteMenuItem(id: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const ref = col.of(tenant.id, "menuItems").doc(id);
   const item = read<MenuItem>(await ref.get());
-  if (!item) return { error: "Item not found." };
+  if (!item) return { error: t("Item not found.") };
   await ref.delete();
   await deleteImage(item.imagePath);
   revalidatePath("/app/menu");
-  return { ok: true, message: `${item.name} deleted` };
+  return { ok: true, message: t("{name} deleted", { name: item.name }) };
 }
 
 /* --------------------------------- Tables --------------------------------- */
@@ -372,15 +383,16 @@ export async function addTables(_: ActionResult, f: FormData): Promise<ActionRes
 
 export async function updateTable(id: string, patch: { label?: string; active?: boolean; regenerate?: boolean }): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const set: Partial<DiningTable> = {};
   if (patch.label !== undefined) {
-    if (!patch.label.trim()) return { error: "Table name can't be empty." };
+    if (!patch.label.trim()) return { error: t("Table name can't be empty.") };
     set.label = patch.label.trim().slice(0, 40);
   }
   if (patch.active !== undefined) set.active = patch.active;
   if (patch.regenerate) set.token = token(12);
   const ref = col.of(tenant.id, "tables").doc(id);
-  if (!(await ref.get()).exists) return { error: "Table not found." };
+  if (!(await ref.get()).exists) return { error: t("Table not found.") };
   await ref.update(set);
   revalidatePath("/app/tables");
   return { ok: true };
@@ -390,47 +402,49 @@ export async function updateTable(id: string, patch: { label?: string; active?: 
 
 export async function saveCustomer(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   try {
     const type = str(f, "type");
-    if (!["member", "staff", "corporate"].includes(type)) return { error: "Pick a customer type." };
+    if (!["member", "staff", "corporate"].includes(type)) return { error: t("Pick a customer type.") };
     const name = str(f, "name");
-    if (!name) return { error: "Enter a name." };
+    if (!name) return { error: t("Enter a name.") };
     const values = {
       type: type as "member" | "staff" | "corporate",
       name: name.slice(0, 120),
       phone: str(f, "phone").slice(0, 32) || null,
       company: str(f, "company").slice(0, 160) || null,
-      creditLimit: type === "corporate" ? sen(f, "creditLimit", "credit limit") : 0,
+      creditLimit: type === "corporate" ? sen(f, "creditLimit", t("credit limit")) : 0,
       active: f.has("active") ? f.getAll("active").includes("on") : true,
     };
     const id = str(f, "id");
     const list = col.of(tenant.id, "customers");
     if (id) {
-      if (!(await list.doc(id).get()).exists) return { error: "Customer not found." };
+      if (!(await list.doc(id).get()).exists) return { error: t("Customer not found.") };
       await list.doc(id).update(values);
     } else {
       const c: Omit<Customer, "id"> = { tenantId: tenant.id, ...values, createdAt: new Date() };
       await list.doc(uid()).create(c);
     }
     revalidatePath("/app/customers");
-    return { ok: true, message: id ? "Saved." : "Customer added." };
+    return { ok: true, message: id ? t("Saved.") : t("Customer added.") };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
 export async function settleCredit(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   try {
     await assertOpenToday(tenant.id);
     const customerId = str(f, "customerId");
     const method = str(f, "method") as "cash" | "duitnow_qr";
-    if (!["cash", "duitnow_qr"].includes(method)) return { error: "Pick how they paid." };
-    const amount = sen(f, "amount", "amount", false);
+    if (!["cash", "duitnow_qr"].includes(method)) return { error: t("Pick how they paid.") };
+    const amount = sen(f, "amount", t("amount"), false);
     const c = customerId ? await getCustomer(tenant.id, customerId) : undefined;
-    if (!c || c.type !== "corporate") return { error: "Corporate customer not found." };
+    if (!c || c.type !== "corporate") return { error: t("Corporate customer not found.") };
     const owing = await outstandingCredit(tenant.id, c.id);
-    if (amount > owing) return { error: `They only owe ${(owing / 100).toFixed(2)}.` };
+    if (amount > owing) return { error: t("They only owe {amount}.", { amount: (owing / 100).toFixed(2) }) };
     const now = new Date();
     const pay: Omit<Payment, "id"> = {
       tenantId: tenant.id,
@@ -449,9 +463,9 @@ export async function settleCredit(_: ActionResult, f: FormData): Promise<Action
     };
     await col.of(tenant.id, "payments").doc(uid()).create(pay);
     revalidatePath("/app/customers");
-    return { ok: true, message: "Payment recorded." };
+    return { ok: true, message: t("Payment recorded.") };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
@@ -459,24 +473,25 @@ export async function settleCredit(_: ActionResult, f: FormData): Promise<Action
 
 export async function saveStaff(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { user: me, tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   const id = str(f, "id");
   const name = str(f, "name");
   const email = str(f, "email").toLowerCase();
   const role = str(f, "role");
   const password = str(f, "password");
-  if (!name) return { error: "Enter a name." };
-  if (!["owner", "cashier", "kitchen"].includes(role)) return { error: "Pick a role." };
-  if (!z.string().email().safeParse(email).success) return { error: "Enter a valid email." };
-  const emailTaken = { error: "That email is already used by another account." };
+  if (!name) return { error: t("Enter a name.") };
+  if (!["owner", "cashier", "kitchen"].includes(role)) return { error: t("Pick a role.") };
+  if (!z.string().email().safeParse(email).success) return { error: t("Enter a valid email.") };
+  const emailTaken = { error: t("That email is already used by another account.") };
   const clash = await getUserByEmail(email);
   if (clash && clash.id !== id) return emailTaken;
 
   try {
     if (id) {
-      if (id === me.id && role !== "owner") return { error: "You can't remove your own owner role." };
+      if (id === me.id && role !== "owner") return { error: t("You can't remove your own owner role.") };
       const set: Partial<User> = { name, email, role: role as "owner" };
       if (password) {
-        if (password.length < 8) return { error: "Password needs at least 8 characters." };
+        if (password.length < 8) return { error: t("Password needs at least 8 characters.") };
         set.passwordHash = await bcrypt.hash(password, 10);
       }
       const ref = col.users().doc(id);
@@ -490,7 +505,7 @@ export async function saveStaff(_: ActionResult, f: FormData): Promise<ActionRes
         tx.update(ref, set);
       });
     } else {
-      if (password.length < 8) return { error: "Set a password of at least 8 characters." };
+      if (password.length < 8) return { error: t("Set a password of at least 8 characters.") };
       const newId = uid();
       const u: Omit<User, "id"> = {
         tenantId: tenant.id,
@@ -508,17 +523,18 @@ export async function saveStaff(_: ActionResult, f: FormData): Promise<ActionRes
     }
   } catch (e) {
     if (isAlreadyExists(e)) return emailTaken;
-    return fail(e);
+    return fail(e, tenant.language);
   }
   revalidatePath("/app/staff");
-  return { ok: true, message: id ? "Saved." : `${name} can now log in.` };
+  return { ok: true, message: id ? t("Saved.") : t("{name} can now log in.", { name }) };
 }
 
 export async function setStaffActive(id: string, active: boolean): Promise<ActionResult> {
   const { user: me, tenant } = await requireUser(["owner"]);
-  if (id === me.id) return { error: "You can't deactivate yourself." };
+  const t = makeT(tenant.language);
+  if (id === me.id) return { error: t("You can't deactivate yourself.") };
   const ref = col.users().doc(id);
-  if ((await ref.get()).get("tenantId") !== tenant.id) return { error: "Staff not found." };
+  if ((await ref.get()).get("tenantId") !== tenant.id) return { error: t("Staff not found.") };
   await ref.update({ active });
   revalidatePath("/app/staff");
   return { ok: true };
@@ -528,28 +544,33 @@ export async function setStaffActive(id: string, active: boolean): Promise<Actio
 
 export async function saveSettings(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const set: Partial<Tenant> = {
       email: str(f, "email").slice(0, 160) || null,
-      sstRate: rate(f, "sstRate", "SST"),
-      serviceChargeRate: rate(f, "serviceChargeRate", "Service charge"),
-      memberDiscountRate: rate(f, "memberDiscountRate", "Member discount"),
-      staffDiscountRate: rate(f, "staffDiscountRate", "Staff discount"),
+      sstRate: rate(f, "sstRate", t("SST")),
+      serviceChargeRate: rate(f, "serviceChargeRate", t("Service charge")),
+      memberDiscountRate: rate(f, "memberDiscountRate", t("Member discount")),
+      staffDiscountRate: rate(f, "staffDiscountRate", t("Staff discount")),
     };
+    const language = str(f, "language");
+    if (isLang(language)) set.language = language;
     await col.tenants().doc(tenant.id).update(set);
     revalidatePath("/app", "layout");
-    return { ok: true, message: "Settings saved." };
+    // Confirm in the language the owner just picked.
+    return { ok: true, message: translate(set.language ?? tenant.language, "Settings saved.") };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
 /** Brand & profile: what customers see on the QR menu, order page and receipt. */
 export async function saveBrand(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
+  const t = makeT(tenant.language);
   try {
     const name = str(f, "name").slice(0, 60);
-    if (!name) return { error: "Enter the kedai name." };
+    if (!name) return { error: t("Enter the kedai name.") };
     const color = str(f, "brandColor").toLowerCase();
     const set: Partial<Tenant> = {
       name,
@@ -571,9 +592,9 @@ export async function saveBrand(_: ActionResult, f: FormData): Promise<ActionRes
     await col.tenants().doc(tenant.id).update(set);
     if (set.logoPath !== undefined && tenant.logoPath && tenant.logoPath !== set.logoPath) await deleteImage(tenant.logoPath);
     revalidatePath("/app", "layout");
-    return { ok: true, message: "Saved. Customers see it straight away." };
+    return { ok: true, message: t("Saved. Customers see it straight away.") };
   } catch (e) {
-    return fail(e);
+    return fail(e, tenant.language);
   }
 }
 
@@ -581,22 +602,23 @@ export async function saveBrand(_: ActionResult, f: FormData): Promise<ActionRes
 
 export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResult> {
   const { user, tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   try {
     const date = str(f, "date");
-    if (!isValidDate(date)) return { error: "Pick a valid date." };
-    if (date > myDate()) return { error: "You can't close a future date." };
+    if (!isValidDate(date)) return { error: t("Pick a valid date.") };
+    if (date > myDate()) return { error: t("You can't close a future date.") };
     const s = await reconSummary(tenant.id, date);
     if (s.openOrders > 0)
-      return { error: `${s.openOrders} order(s) on ${date} are still unpaid. Settle or cancel them first.` };
-    const openingFloat = sen(f, "openingFloat", "opening float");
+      return { error: t("{n} order(s) on {date} are still unpaid. Settle or cancel them first.", { n: s.openOrders, date }) };
+    const openingFloat = sen(f, "openingFloat", t("opening float"));
     const rec: Omit<Reconciliation, "id"> = {
       tenantId: tenant.id,
       businessDate: date,
       openingFloat,
       expectedCash: s.byMethod.cash + s.settlements.cash,
-      countedCash: sen(f, "countedCash", "cash counted"),
+      countedCash: sen(f, "countedCash", t("cash counted")),
       expectedQr: s.byMethod.duitnow_qr + s.settlements.duitnow_qr,
-      bankQr: sen(f, "bankQr", "QR in bank"),
+      bankQr: sen(f, "bankQr", t("QR in bank")),
       creditSales: s.byMethod.credit,
       notes: str(f, "notes").slice(0, 500) || null,
       closedBy: user.id,
@@ -604,16 +626,17 @@ export async function closeDay(_: ActionResult, f: FormData): Promise<ActionResu
     };
     await col.of(tenant.id, "reconciliations").doc(date).create(rec);
     revalidatePath("/app/recon");
-    return { ok: true, message: `${date} closed.` };
+    return { ok: true, message: t("{date} closed.", { date }) };
   } catch (e) {
-    if (isAlreadyExists(e)) return { error: "This date is already closed." };
-    return fail(e);
+    if (isAlreadyExists(e)) return { error: t("This date is already closed.") };
+    return fail(e, tenant.language);
   }
 }
 
 export async function reopenDay(date: string): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner"]);
-  if (!isValidDate(date)) return { error: "Pick a valid date." };
+  const t = makeT(tenant.language);
+  if (!isValidDate(date)) return { error: t("Pick a valid date.") };
   await col.of(tenant.id, "reconciliations").doc(date).delete();
   revalidatePath("/app/recon");
   return { ok: true };

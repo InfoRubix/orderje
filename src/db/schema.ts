@@ -24,6 +24,8 @@
  * Every query is a single-field filter, so no composite indexes are needed.
  */
 
+import type { Lang } from "@/lib/i18n";
+
 export type Role = "owner" | "cashier" | "kitchen";
 export type OrderType = "dine_in" | "takeaway" | "delivery";
 export type CustomerType = "walk_in" | "member" | "staff" | "corporate";
@@ -49,6 +51,8 @@ export type Tenant = {
   logoPath: string | null;
   /** #rrggbb, used for the customer menu header, buttons and prices. */
   brandColor: string;
+  /** Language for the kedai's staff screens and customer pages. */
+  language: Lang;
   sstRate: number;
   serviceChargeRate: number;
   memberDiscountRate: number;

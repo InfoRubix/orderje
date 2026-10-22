@@ -6,6 +6,7 @@ import type { OrderStatus } from "@/db/schema";
 import { ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Empty } from "@/components/ui";
+import { useT } from "@/components/i18n";
 import { setOrderStatus } from "../actions";
 
 type Ticket = {
@@ -46,6 +47,7 @@ function beep() {
 }
 
 export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
+  const tr = useT();
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [offline, setOffline] = useState(false);
   const [sound, setSound] = useState(false);
@@ -95,9 +97,9 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl md:text-4xl">Kitchen</h1>
+          <h1 className="font-display text-3xl md:text-4xl">{tr("Kitchen")}</h1>
           <p className="text-sm text-ink-soft">
-            {offline ? <span className="font-semibold text-chili">Connection lost, retrying…</span> : "Updates every few seconds."}
+            {offline ? <span className="font-semibold text-chili">{tr("Connection lost, retrying…")}</span> : tr("Updates every few seconds.")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -109,29 +111,29 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
             }}
           >
             {sound ? <Bell className="size-4" /> : <BellOff className="size-4" />}
-            {sound ? "Sound on" : "Turn on sound"}
+            {sound ? tr("Sound on") : tr("Turn on sound")}
           </Button>
           <Button variant="secondary" onClick={() => document.documentElement.requestFullscreen?.()}>
-            <Maximize className="size-4" /> Full screen
+            <Maximize className="size-4" /> {tr("Full screen")}
           </Button>
         </div>
       </div>
 
       {tickets === null ? (
-        <p className="text-ink-soft">Loading orders…</p>
+        <p className="text-ink-soft">{tr("Loading orders…")}</p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
           {COLUMNS.map((col) => {
             const list = tickets.filter((t) => t.status === col.status);
             return (
-              <section key={col.status} aria-label={col.title}>
+              <section key={col.status} aria-label={tr(col.title)}>
                 <h2 className="mb-3 flex items-center gap-2 font-display text-xl">
-                  {col.title}
+                  {tr(col.title)}
                   <span className="num rounded-md bg-tag px-2 text-sm text-on-tag">{list.length}</span>
                 </h2>
                 <div className="space-y-5">
                   {list.length === 0 ? (
-                    <Empty title={col.status === "new" ? "No new orders" : "Nothing here"} />
+                    <Empty title={col.status === "new" ? tr("No new orders") : tr("Nothing here")} />
                   ) : (
                     list.map((t) => {
                       const mins = Math.max(0, Math.floor((now - t.createdAt) / 60000));
@@ -141,16 +143,16 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
                             <div>
                               <p className="num font-display text-4xl leading-none">#{t.orderNo}</p>
                               <p className="mt-1 text-sm font-semibold">
-                                {t.tableLabel ?? ORDER_TYPE_LABEL[t.orderType]}
+                                {t.tableLabel ?? tr(ORDER_TYPE_LABEL[t.orderType])}
                                 {t.customerName ? ` · ${t.customerName}` : ""}
                               </p>
                             </div>
                             <div className="text-right">
                               <p className={cn("num text-sm font-bold", mins >= 15 ? "text-chili" : mins >= 8 ? "text-teh" : "text-ink-soft")}>
-                                {mins} min
+                                {tr("{n} min", { n: mins })}
                               </p>
                               <div className="mt-1 flex justify-end gap-1">
-                                {t.orderType !== "dine_in" ? <Badge tone="amber">{ORDER_TYPE_LABEL[t.orderType]}</Badge> : null}
+                                {t.orderType !== "dine_in" ? <Badge tone="amber">{tr(ORDER_TYPE_LABEL[t.orderType])}</Badge> : null}
                                 {t.source === "qr" ? <Badge>QR</Badge> : null}
                               </div>
                             </div>
@@ -167,23 +169,23 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
                               </li>
                             ))}
                           </ul>
-                          {t.note ? <p className="mb-3 rounded bg-teh-soft px-2 py-1 text-sm font-semibold text-teh">Note: {t.note}</p> : null}
+                          {t.note ? <p className="mb-3 rounded bg-teh-soft px-2 py-1 text-sm font-semibold text-teh">{tr("Note: {note}", { note: t.note })}</p> : null}
                           <div className="flex gap-2">
                             <Button size="lg" className="flex-1" onClick={() => move(t, col.next)}>
-                              {col.action}
+                              {tr(col.action)}
                             </Button>
                             {col.status === "new" && canCancel ? (
                               <Button
                                 size="lg"
                                 variant="secondary"
-                                onClick={() => confirm(`Cancel order #${t.orderNo}?`) && move(t, "cancelled")}
+                                onClick={() => confirm(tr("Cancel order #{n}?", { n: t.orderNo })) && move(t, "cancelled")}
                               >
-                                Cancel
+                                {tr("Cancel")}
                               </Button>
                             ) : null}
                             {col.status !== "new" ? (
                               <Button size="lg" variant="ghost" onClick={() => move(t, col.status === "ready" ? "preparing" : "new")}>
-                                Undo
+                                {tr("Undo")}
                               </Button>
                             ) : null}
                           </div>

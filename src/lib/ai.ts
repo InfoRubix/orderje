@@ -93,7 +93,7 @@ async function takeQuota(tenantId: string) {
   return fs().runTransaction(async (tx) => {
     const used = Number((await tx.get(ref)).get("count") ?? 0);
     if (used >= AI_DAILY_LIMIT)
-      throw new OrderError(`Had AI hari ini sudah habis (${AI_DAILY_LIMIT} permintaan). Cuba lagi esok.`);
+      throw new OrderError("Today's AI limit is used up ({n} requests). Try again tomorrow.", { n: AI_DAILY_LIMIT });
     tx.set(ref, { count: used + 1, updatedAt: new Date() }, { merge: true });
     return AI_DAILY_LIMIT - used - 1;
   });
@@ -131,11 +131,11 @@ export async function askMenuAssistant(args: {
   imageIds: string[];
   draft: unknown;
 }): Promise<{ proposal: ProposalT; left: number }> {
-  if (!aiEnabled()) throw new OrderError("AI belum disediakan. Minta Rubix tetapkan OPENAI_API_KEY.");
+  if (!aiEnabled()) throw new OrderError("AI isn't set up yet. Ask Rubix to set OPENAI_API_KEY.");
   const left = await takeQuota(args.tenant.id);
 
   const images = (await Promise.all(args.imageIds.map((id) => getImage(args.tenant.id, id)))).map((img, i) => {
-    if (!img) throw new OrderError("Gambar yang dilampirkan tidak dijumpai. Lampirkan semula.");
+    if (!img) throw new OrderError("An attached image couldn't be found. Attach it again.");
     return { i, img };
   });
 
@@ -170,15 +170,15 @@ export async function askMenuAssistant(args: {
       text: { format: zodTextFormat(Proposal, "menu_proposal") },
     });
     const proposal = response.output_parsed;
-    if (!proposal) throw new OrderError("AI tak dapat memproses permintaan ini. Cuba ayat lain atau gambar lain.");
+    if (!proposal) throw new OrderError("The AI couldn't handle this request. Try different wording or another image.");
     return { proposal, left };
   } catch (e) {
     if (e instanceof OrderError) throw e;
-    if (e instanceof OpenAI.RateLimitError) throw new OrderError("AI sibuk sekarang. Cuba lagi dalam seminit.");
-    if (e instanceof OpenAI.AuthenticationError) throw new OrderError("Kunci OpenAI tidak sah. Minta Rubix semak OPENAI_API_KEY.");
+    if (e instanceof OpenAI.RateLimitError) throw new OrderError("The AI is busy right now. Try again in a minute.");
+    if (e instanceof OpenAI.AuthenticationError) throw new OrderError("The OpenAI key is invalid. Ask Rubix to check OPENAI_API_KEY.");
     if (e instanceof OpenAI.APIError) {
       console.error("OpenAI error", e.status, e.message);
-      throw new OrderError("AI tak dapat dihubungi sekarang. Cuba lagi sebentar.");
+      throw new OrderError("Can't reach the AI right now. Try again shortly.");
     }
     throw e;
   }

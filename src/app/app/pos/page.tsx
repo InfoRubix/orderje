@@ -5,6 +5,7 @@ import { ordersCreatedBetween, ordersPaidBetween } from "@/lib/repo";
 import { rm } from "@/lib/money";
 import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { minutesAgo } from "@/lib/time";
+import { makeT } from "@/lib/i18n";
 import { buttonVariants, Badge, Empty, PageHeader } from "@/components/ui";
 import { AutoRefresh } from "@/components/auto-refresh";
 
@@ -15,6 +16,7 @@ const STATUS_TONE = { new: "amber", preparing: "amber", ready: "green", served: 
 
 export default async function PosPage() {
   const { tenant } = await requireUser(["owner", "cashier"]);
+  const t = makeT(tenant.language);
   const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
   const [recent, paid] = await Promise.all([
@@ -31,19 +33,19 @@ export default async function PosPage() {
     <div>
       <AutoRefresh every={5000} />
       <PageHeader
-        title="Counter"
-        sub="Unpaid bills and new orders. Customers pay here."
+        title={t("Counter")}
+        sub={t("Unpaid bills and new orders. Customers pay here.")}
         actions={
           <Link href="/app/pos/new" className={buttonVariants({ size: "lg" })}>
-            <Plus className="size-5" aria-hidden /> New order
+            <Plus className="size-5" aria-hidden /> {t("New order")}
           </Link>
         }
       />
 
       <section className="mb-8">
-        <h2 className="mb-3 font-display text-lg font-bold">Unpaid bills ({unpaid.length})</h2>
+        <h2 className="mb-3 font-display text-lg font-bold">{t("Unpaid bills ({n})", { n: unpaid.length })}</h2>
         {unpaid.length === 0 ? (
-          <Empty title="All bills are settled">New QR orders show up here until they&apos;re paid.</Empty>
+          <Empty title={t("All bills are settled")}>{t("New QR orders show up here until they're paid.")}</Empty>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[...byTable, ...others].map((o) => (
@@ -53,20 +55,20 @@ export default async function PosPage() {
                 className="group rounded-xl border-2 border-edge bg-surface p-4 hover:bg-tag-soft"
               >
                 <div className="flex items-start justify-between">
-                  <p className="font-display text-lg font-bold">{o.tableLabel ?? ORDER_TYPE_LABEL[o.orderType]}</p>
+                  <p className="font-display text-lg font-bold">{o.tableLabel ?? t(ORDER_TYPE_LABEL[o.orderType])}</p>
                   <Badge tone={STATUS_TONE[o.status]}>
-                    {o.status}
+                    {t(o.status)}
                   </Badge>
                 </div>
                 <p className="num text-sm text-ink-soft">
-                  #{o.orderNo} · {minutesAgo(o.createdAt)} min ago
+                  #{o.orderNo} · {t("{n} min ago", { n: minutesAgo(o.createdAt) })}
                   {o.customerName ? ` · ${o.customerName}` : ""}
                 </p>
                 <p className="num mt-3 text-2xl font-bold">{rm(o.total)}</p>
                 <p className="text-xs text-mute">
-                  {CUSTOMER_TYPE_LABEL[o.customerType]} · {o.source === "qr" ? "QR order" : "Counter order"}
+                  {t(CUSTOMER_TYPE_LABEL[o.customerType])} · {o.source === "qr" ? t("QR order") : t("Counter order")}
                 </p>
-                <p className="mt-3 text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">Take payment</p>
+                <p className="mt-3 text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">{t("Take payment")}</p>
               </Link>
             ))}
           </div>
@@ -75,17 +77,17 @@ export default async function PosPage() {
 
       {recentPaid.length ? (
         <section>
-          <h2 className="mb-3 font-display text-lg font-bold">Just paid</h2>
+          <h2 className="mb-3 font-display text-lg font-bold">{t("Just paid")}</h2>
           <ul className="divide-y divide-line rounded-xl border-2 border-edge bg-surface">
             {recentPaid.map((o) => (
               <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <Link href={`/app/orders/${o.id}`} className="font-semibold hover:underline">
-                  #{o.orderNo} {o.tableLabel ?? ORDER_TYPE_LABEL[o.orderType]}
+                  #{o.orderNo} {o.tableLabel ?? t(ORDER_TYPE_LABEL[o.orderType])}
                 </Link>
-                <span className="text-ink-soft">{o.paidMethod ? METHOD_LABEL[o.paidMethod] : ""}</span>
+                <span className="text-ink-soft">{o.paidMethod ? t(METHOD_LABEL[o.paidMethod]) : ""}</span>
                 <span className="num">{rm(o.total)}</span>
                 <a href={`/r/${o.publicToken}?print=1`} target="_blank" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
-                  Print receipt
+                  {t("Print receipt")}
                 </a>
               </li>
             ))}

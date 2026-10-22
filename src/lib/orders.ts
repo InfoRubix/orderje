@@ -12,11 +12,13 @@ import type {
   Tenant,
 } from "@/db/schema";
 import { computeTotals } from "./pricing";
+import { UserError } from "./i18n";
 import { cashRound } from "./money";
 import { getCustomer, getTenant, listCategories } from "./repo";
 import { token, uid } from "./utils";
 
-export class OrderError extends Error {}
+/** A mistake the user can fix; English template + params so it can be shown in either language. */
+export class OrderError extends UserError {}
 
 /* ---------------------------------- Menu ---------------------------------- */
 
@@ -73,7 +75,7 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
   return lines.map((l) => {
     const item = items.find((i) => i.id === l.menuItemId);
     if (!item) throw new OrderError("An item in your cart is no longer on the menu.");
-    if (!item.available) throw new OrderError(`${item.name} is sold out.`);
+    if (!item.available) throw new OrderError("{name} is sold out.", { name: item.name });
     const qty = Math.trunc(l.qty);
     if (!(qty >= 1 && qty <= 99)) throw new OrderError("Quantity must be between 1 and 99.");
 
@@ -81,13 +83,13 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
     const chosen = [...new Set(l.optionIds)].map((id) => {
       const g = groups.find((x) => x.options.some((o) => o.id === id));
       const o = g?.options.find((x) => x.id === id);
-      if (!o || !g) throw new OrderError(`An add-on for ${item.name} is no longer available.`);
+      if (!o || !g) throw new OrderError("An add-on for {name} is no longer available.", { name: item.name });
       return { o, g };
     });
     for (const g of groups) {
       const n = chosen.filter((c) => c.g.id === g.id).length;
-      if (g.required && n === 0) throw new OrderError(`Choose ${g.name} for ${item.name}.`);
-      if (n > g.maxSelect) throw new OrderError(`Pick up to ${g.maxSelect} for ${g.name}.`);
+      if (g.required && n === 0) throw new OrderError("Choose {group} for {name}.", { group: g.name, name: item.name });
+      if (n > g.maxSelect) throw new OrderError("Pick up to {max} for {group}.", { max: g.maxSelect, group: g.name });
     }
     const unitPrice = item.price + chosen.reduce((s, c) => s + c.o.price, 0);
     return {
@@ -105,10 +107,11 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
 
 async function resolveCustomer(tenantId: string, type: CustomerType, customerId?: string | null) {
   if (type === "walk_in") return null;
+  // The type is part of the template (one per type) so the Malay can say it naturally.
   if (!customerId) throw new OrderError(`Pick which ${type} this order belongs to.`);
   const c = await getCustomer(tenantId, customerId);
   if (!c || !c.active) throw new OrderError("Customer not found.");
-  if (c.type !== type) throw new OrderError(`${c.name} is registered as ${c.type}, not ${type}.`);
+  if (c.type !== type) throw new OrderError(`{name} is registered as ${c.type}, not ${type}.`, { name: c.name });
   return c;
 }
 
@@ -279,7 +282,7 @@ export async function payAtCounter(p: PayInput) {
     if (!c) throw new OrderError("Customer not found.");
     const owing = await outstandingCredit(p.tenant.id, order.customerId);
     if (c.creditLimit > 0 && owing + order.total > c.creditLimit)
-      throw new OrderError(`${c.name} would exceed their credit limit.`);
+      throw new OrderError("{name} would exceed their credit limit.", { name: c.name });
     paymentStatus = "credit";
   }
 

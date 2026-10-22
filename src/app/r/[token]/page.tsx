@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { makeT } from "@/lib/i18n";
 import { getOrderByToken } from "@/lib/orders";
 import { getTenant } from "@/lib/repo";
 import { rm } from "@/lib/money";
@@ -6,10 +7,16 @@ import { CUSTOMER_TYPE_LABEL, METHOD_LABEL, ORDER_TYPE_LABEL } from "@/lib/prici
 import { fmtDateTime } from "@/lib/time";
 import { appUrl } from "@/lib/utils";
 import { brandStyle } from "@/lib/brand";
+import { I18nProvider } from "@/components/i18n";
 import { ReceiptActions } from "./actions-bar";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Receipt" };
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const order = await getOrderByToken(token);
+  const tenant = order ? await getTenant(order.tenantId) : undefined;
+  return { title: makeT(tenant?.language ?? "en")("Receipt") };
+}
 
 export default async function ReceiptPage({
   params,
@@ -24,15 +31,18 @@ export default async function ReceiptPage({
   if (!order) notFound();
   const t = await getTenant(order.tenantId);
   if (!t) notFound();
+  const tr = makeT(t.language);
   const paid = order.payments.filter((p) => p.status === "success");
   const settled = order.paymentStatus === "paid" || order.paymentStatus === "credit";
 
   return (
     <main className="brand min-h-dvh bg-paper py-6 print:bg-white print:py-0" style={brandStyle(t.brandColor)}>
-      <ReceiptActions
-        autoPrint={print === "1"}
-        shareText={`Receipt ${t.name} #${order.orderNo}: ${appUrl()}/r/${order.publicToken}`}
-      />
+      <I18nProvider lang={t.language}>
+        <ReceiptActions
+          autoPrint={print === "1"}
+          shareText={tr("Receipt {shop} #{n}: {url}", { shop: t.name, n: order.orderNo, url: `${appUrl()}/r/${order.publicToken}` })}
+        />
+      </I18nProvider>
       <article className="slip mx-auto w-[80mm] max-w-full px-4 pb-6 pt-5 font-mono text-[12px] leading-snug text-ink print:shadow-none print:after:hidden">
         <header className="text-center">
           {t.logoUrl ? (
@@ -41,17 +51,17 @@ export default async function ReceiptPage({
           ) : null}
           <p className="font-sans text-base font-bold">{t.name}</p>
           {t.address ? <p>{t.address}</p> : null}
-          {t.phone ? <p>Tel {t.phone}</p> : null}
+          {t.phone ? <p>{tr("Tel {phone}", { phone: t.phone })}</p> : null}
         </header>
         <div className="my-3 border-t border-dashed border-ink/40" />
         <p className="flex justify-between">
-          <span>Order #{order.orderNo}</span>
-          <span>{ORDER_TYPE_LABEL[order.orderType]}</span>
+          <span>{tr("Order #{n}", { n: order.orderNo })}</span>
+          <span>{tr(ORDER_TYPE_LABEL[order.orderType])}</span>
         </p>
-        <p>{fmtDateTime(order.paidAt ?? order.createdAt)}</p>
+        <p>{fmtDateTime(order.paidAt ?? order.createdAt, t.language)}</p>
         {order.tableLabel ? <p>{order.tableLabel}</p> : null}
         <p>
-          {CUSTOMER_TYPE_LABEL[order.customerType]}
+          {tr(CUSTOMER_TYPE_LABEL[order.customerType])}
           {order.customerName ? `: ${order.customerName}` : ""}
         </p>
         <div className="my-3 border-t border-dashed border-ink/40" />
@@ -70,13 +80,13 @@ export default async function ReceiptPage({
         </ul>
         <div className="my-3 border-t border-dashed border-ink/40" />
         <dl className="space-y-0.5">
-          <L k="Subtotal" v={order.subtotal} />
-          {order.discount ? <L k={`Discount (${CUSTOMER_TYPE_LABEL[order.customerType]})`} v={-order.discount} /> : null}
-          {order.serviceCharge ? <L k="Service charge" v={order.serviceCharge} /> : null}
-          {order.sst ? <L k="SST" v={order.sst} /> : null}
-          {order.rounding ? <L k="Rounding" v={order.rounding} /> : null}
+          <L k={tr("Subtotal")} v={order.subtotal} />
+          {order.discount ? <L k={tr("Discount ({type})", { type: tr(CUSTOMER_TYPE_LABEL[order.customerType]) })} v={-order.discount} /> : null}
+          {order.serviceCharge ? <L k={tr("Service charge")} v={order.serviceCharge} /> : null}
+          {order.sst ? <L k={tr("SST")} v={order.sst} /> : null}
+          {order.rounding ? <L k={tr("Rounding")} v={order.rounding} /> : null}
           <div className="flex justify-between pt-1 text-sm font-bold">
-            <dt>TOTAL</dt>
+            <dt>{tr("TOTAL")}</dt>
             <dd>{rm(order.total)}</dd>
           </div>
         </dl>
@@ -84,16 +94,16 @@ export default async function ReceiptPage({
         {settled ? (
           paid.map((p) => (
             <div key={p.id} className="space-y-0.5">
-              <L k={METHOD_LABEL[p.method]} v={p.method === "cash" ? p.tendered ?? p.amount : p.amount} />
-              {p.method === "cash" && p.changeGiven ? <L k="Change" v={p.changeGiven} /> : null}
-              {p.reference ? <p className="text-ink-soft">Ref {p.reference}</p> : null}
+              <L k={tr(METHOD_LABEL[p.method])} v={p.method === "cash" ? p.tendered ?? p.amount : p.amount} />
+              {p.method === "cash" && p.changeGiven ? <L k={tr("Change")} v={p.changeGiven} /> : null}
+              {p.reference ? <p className="text-ink-soft">{tr("Ref {ref}", { ref: p.reference })}</p> : null}
             </div>
           ))
         ) : (
-          <p className="text-center font-bold">UNPAID</p>
+          <p className="text-center font-bold">{tr("UNPAID")}</p>
         )}
         <div className="my-3 border-t border-dashed border-ink/40" />
-        <p className="text-center">{t.receiptFooter || "Terima kasih, datang lagi!"}</p>
+        <p className="text-center">{t.receiptFooter || tr("Terima kasih, datang lagi!")}</p>
       </article>
     </main>
   );

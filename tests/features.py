@@ -675,23 +675,23 @@ with sync_playwright() as p:
     @check("AI Menu: poster to draft, fix price and crop, apply to the menu")
     def _():
         page.goto(f"{BASE}/app/assistant")
-        expect(page.get_by_text("Apa nak ubah dalam menu?")).to_be_visible()
-        expect(page.get_by_text("Baki hari ini: 30/30")).to_be_visible()
-        page.set_input_files("input[aria-label='Lampirkan gambar']", IMG)
-        expect(page.get_by_alt_text("Lampiran")).to_be_visible()
-        page.get_by_label("Mesej untuk AI").fill("Masukkan semua menu dalam poster ni")
-        page.get_by_label("Mesej untuk AI").press("Enter")
+        expect(page.get_by_text("What do you want to change on the menu?")).to_be_visible()
+        expect(page.get_by_text("Left today: 30/30")).to_be_visible()
+        page.set_input_files("input[aria-label='Attach image']", IMG)
+        expect(page.get_by_alt_text("Attachment")).to_be_visible()
+        page.get_by_label("Message to the AI").fill("Masukkan semua menu dalam poster ni")
+        page.get_by_label("Message to the AI").press("Enter")
         expect(page.get_by_text("Saya jumpa 3 menu dalam poster")).to_be_visible(timeout=20000)
-        expect(page.get_by_text("Baki hari ini: 29/30")).to_be_visible()
-        cards = page.get_by_role("region", name="Draf perubahan").get_by_label("Nama item")
+        expect(page.get_by_text("Left today: 29/30")).to_be_visible()
+        cards = page.get_by_role("region", name="Draft changes").get_by_label("Item name")
         expect(cards).to_have_count(3)
         teh = page.locator("div.p-4", has=page.locator("input[value='Teh O Ais']"))
-        teh.get_by_label("Harga").fill("3.00")
-        page.get_by_role("button", name="Ubah potongan gambar Set A Simple Tapi Padu").click()
+        teh.get_by_label("Price").fill("3.00")
+        page.get_by_role("button", name="Change photo crop for Set A Simple Tapi Padu").click()
         expect(page.get_by_role("dialog")).to_be_visible()
-        page.get_by_role("button", name="Guna potongan ini").click()
-        page.get_by_role("button", name="Masukkan ke menu").first.click()
-        expect(page.get_by_text("Menu disimpan: 3 ditambah").first).to_be_visible(timeout=20000)
+        page.get_by_role("button", name="Use this crop").click()
+        page.get_by_role("button", name="Add to menu").first.click()
+        expect(page.get_by_text("Menu saved: 3 added").first).to_be_visible(timeout=20000)
         a = one("menuItems", state["t1"], name="Set A Simple Tapi Padu")
         assert a["price"] == 1200 and a["imageUrl"] and a["groups"][0]["name"] == "Ayam" and a["groups"][0]["required"], a
         assert http_status(BASE + a["imageUrl"]) == 200
@@ -703,6 +703,50 @@ with sync_playwright() as p:
         cashier = state["cashier_ctx"].pages[-1]
         cashier.goto(f"{BASE}/app/assistant")
         expect(cashier).to_have_url(f"{BASE}/app/pos")  # owners only
+
+    # ------------------------------------------------------------------ language
+    @check("Language: Bahasa Melayu in Settings switches staff screens, customer menu and errors")
+    def _():
+        page.goto(f"{BASE}/app/settings")
+        page.get_by_label("Language / Bahasa").select_option("ms")
+        page.click("button:has-text('Save settings')")
+        expect(page.get_by_text("Tetapan disimpan.")).to_be_visible()
+        assert one("tenants", name="Kedai Satu")["language"] == "ms"
+        page.goto(f"{BASE}/app/pos")
+        expect(page.get_by_role("heading", name="Kaunter")).to_be_visible()
+        expect(page.get_by_role("link", name="Papan pemuka")).to_be_visible()
+        expect(page.get_by_text("Bil belum bayar dan pesanan baru. Pelanggan bayar di sini.")).to_be_visible()
+        # server errors come back in Malay too
+        page.goto(f"{BASE}/app/settings")
+        page.fill("input[name=sstRate]", "150")
+        page.click("button:has-text('Simpan tetapan')")
+        expect(page.get_by_text("SST mesti antara 0 hingga 100%.")).to_be_visible()
+        # the customer menu follows the kedai's language
+        c = state["phone"].new_page()
+        c.goto(f"{BASE}/t/{state['slug1']}/{state['tok1']}")
+        expect(c.get_by_text(re.compile("^Anda di "))).to_be_visible()
+        c.goto(f"{BASE}/t/{state['slug1']}/takeaway")
+        expect(c.get_by_text("Pesanan bungkus")).to_be_visible()
+        c.close()
+        # back to English for the remaining checks
+        page.goto(f"{BASE}/app/settings")
+        page.get_by_label("Language / Bahasa").select_option("en")
+        page.click("button:has-text('Simpan tetapan')")
+        page.wait_for_timeout(1200)
+        page.goto(f"{BASE}/app/pos")
+        expect(page.get_by_role("heading", name="Counter")).to_be_visible()
+
+    @check("Language: login page switch BM | EN")
+    def _():
+        anon = browser.new_context()
+        pg = anon.new_page()
+        pg.goto(f"{BASE}/login")
+        expect(pg.get_by_role("heading", name="Log in")).to_be_visible()
+        pg.get_by_role("button", name="BM").click()
+        expect(pg.get_by_role("heading", name="Log masuk")).to_be_visible()
+        pg.get_by_role("button", name="EN").click()
+        expect(pg.get_by_role("heading", name="Log in")).to_be_visible()
+        anon.close()
 
     # ------------------------------------------------------------------ admin
     @check("Admin: only Rubix emails; suspend blocks login and QR ordering; reactivate")

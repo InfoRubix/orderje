@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@/db/schema";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n";
 
 const ITEMS = [
   { href: "/app", label: "Dashboard", icon: BarChart3, roles: ["owner"] },
@@ -36,6 +37,7 @@ const ITEMS = [
 
 export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) {
   const path = usePathname();
+  const t = useT();
   const items = ITEMS.filter((i) => (i.roles as readonly Role[]).includes(role));
   const active = (href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
 
@@ -52,7 +54,7 @@ export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) 
             )}
           >
             <Icon className="size-5" aria-hidden />
-            {label}
+            {t(label)}
           </Link>
         ))}
       </nav>
@@ -71,7 +73,7 @@ export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) 
           )}
         >
           <Icon className="size-4.5" aria-hidden />
-          {label}
+          {t(label)}
         </Link>
       ))}
     </nav>
