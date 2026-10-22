@@ -49,7 +49,7 @@ export function fs(): Firestore {
   return store;
 }
 
-export type TenantSub = "categories" | "menuItems" | "tables" | "customers" | "orders" | "payments" | "reconciliations";
+export type TenantSub = "categories" | "menuItems" | "tables" | "customers" | "orders" | "payments" | "reconciliations" | "aiUsage";
 
 export const col = {
   tenants: () => fs().collection("tenants"),

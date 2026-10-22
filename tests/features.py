@@ -671,6 +671,39 @@ with sync_playwright() as p:
         page.goto(f"{BASE}/app/recon?date=2099-01-01")
         expect(page.get_by_text("Today", exact=True)).to_be_visible()  # future dates fall back to today
 
+    # ------------------------------------------------------------------ AI menu assistant (mock mode)
+    @check("AI Menu: poster to draft, fix price and crop, apply to the menu")
+    def _():
+        page.goto(f"{BASE}/app/assistant")
+        expect(page.get_by_text("Apa nak ubah dalam menu?")).to_be_visible()
+        expect(page.get_by_text("Baki hari ini: 30/30")).to_be_visible()
+        page.set_input_files("input[aria-label='Lampirkan gambar']", IMG)
+        expect(page.get_by_alt_text("Lampiran")).to_be_visible()
+        page.get_by_label("Mesej untuk AI").fill("Masukkan semua menu dalam poster ni")
+        page.get_by_label("Mesej untuk AI").press("Enter")
+        expect(page.get_by_text("Saya jumpa 3 menu dalam poster")).to_be_visible(timeout=20000)
+        expect(page.get_by_text("Baki hari ini: 29/30")).to_be_visible()
+        cards = page.get_by_role("region", name="Draf perubahan").get_by_label("Nama item")
+        expect(cards).to_have_count(3)
+        teh = page.locator("div.p-4", has=page.locator("input[value='Teh O Ais']"))
+        teh.get_by_label("Harga").fill("3.00")
+        page.get_by_role("button", name="Ubah potongan gambar Set A Simple Tapi Padu").click()
+        expect(page.get_by_role("dialog")).to_be_visible()
+        page.get_by_role("button", name="Guna potongan ini").click()
+        page.get_by_role("button", name="Masukkan ke menu").first.click()
+        expect(page.get_by_text("Menu disimpan: 3 ditambah").first).to_be_visible(timeout=20000)
+        a = one("menuItems", state["t1"], name="Set A Simple Tapi Padu")
+        assert a["price"] == 1200 and a["imageUrl"] and a["groups"][0]["name"] == "Ayam" and a["groups"][0]["required"], a
+        assert http_status(BASE + a["imageUrl"]) == 200
+        assert one("menuItems", state["t1"], name="Teh O Ais")["price"] == 300
+        set_cat = one("categories", state["t1"], name="Set Ayam Gepuk")
+        assert one("menuItems", state["t1"], name="Set B Kenyang Puas")["categoryId"] == set_cat["_id"]
+        assert len(docs("categories", state["t1"], name="Minuman")) == 1  # reused, not duplicated
+        assert docs("aiUsage", state["t1"])[0]["count"] == 1
+        cashier = state["cashier_ctx"].pages[-1]
+        cashier.goto(f"{BASE}/app/assistant")
+        expect(cashier).to_have_url(f"{BASE}/app/pos")  # owners only
+
     # ------------------------------------------------------------------ admin
     @check("Admin: only Rubix emails; suspend blocks login and QR ordering; reactivate")
     def _():

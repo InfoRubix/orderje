@@ -29,6 +29,12 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Settings: SST, service charge (dine-in only), member/staff discount.
 - Light and dark mode follow the device.
 
+**AI Menu (owner)** at `/app/assistant`
+- Chat with an assistant (OpenAI, `OPENAI_MODEL`, default `gpt-6.1-sol`). Attach a menu poster or food photos, or type a list ("Tambah Teh O Ais RM2.50 dalam Minuman", "Set B naik 50 sen", "Roti Telur habis hari ini").
+- It reads names, prices, set contents and choices (e.g. Ayam: Original / Crispy) and locates each food photo on the poster.
+- Nothing is saved until the owner reviews the draft: edit names, prices and categories, drag the crop box on each photo, drop changes, then **Masukkan ke menu**. Photos are cropped on the server.
+- Each kedai gets `AI_DAILY_LIMIT` requests a day (default 30). `OPENAI_API_KEY=mock` returns canned answers for local testing; leave it empty to hide the page.
+
 **Rubix (super admin)** at `/admin`: every kedai, 30-day order count, suspend / reactivate.
 
 ## Clickable demo
@@ -65,6 +71,9 @@ Sign up at `/signup` (tick "Start with a sample mamak menu" for demo data). The 
 | `FIRESTORE_EMULATOR_HOST` | Local only: `127.0.0.1:8080` to use the emulator |
 | `FIREBASE_PROJECT_ID` | Firebase project ID (`demo-orderje` for the emulator) |
 | `FIREBASE_SERVICE_ACCOUNT` | Service-account JSON (raw or base64) for the real project. Required on Vercel |
+| `OPENAI_API_KEY` | OpenAI key for AI Menu. Empty hides the feature; `mock` for local tests |
+| `OPENAI_MODEL` | Model for AI Menu (default `gpt-6.1-sol`) |
+| `AI_DAILY_LIMIT` | AI requests per kedai per day (default 30) |
 
 ## Deploy: Vercel + Firestore
 

@@ -25,11 +25,24 @@ async function readImage(file: File) {
 }
 
 /** Saves an image and returns its id (kept to delete it later) and the URL to show it. */
-export async function putImage(tenantId: string, file: File) {
-  const data = await readImage(file);
+export async function putImage(tenantId: string, file: File, kind: "menu" | "ai-source" = "menu") {
+  return putImageBytes(tenantId, await readImage(file), file.type, kind);
+}
+
+/** Saves already-checked bytes, e.g. a photo cropped out of a menu poster on the server. */
+export async function putImageBytes(tenantId: string, data: Buffer, contentType: string, kind: "menu" | "ai-source" = "menu") {
+  if (data.length > MAX_BYTES) throw new OrderError("That image is too big. Try a smaller photo.");
   const id = randomUUID();
-  await col.images().doc(id).create({ tenantId, contentType: file.type, data, createdAt: new Date() });
+  await col.images().doc(id).create({ tenantId, contentType, data, kind, createdAt: new Date() });
   return { path: id, url: `/img/${id}` };
+}
+
+/** Reads one of this kedai's images back; undefined if it doesn't exist or belongs to another kedai. */
+export async function getImage(tenantId: string, id: string) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return undefined;
+  const snap = await col.images().doc(id).get();
+  if (!snap.exists || snap.get("tenantId") !== tenantId) return undefined;
+  return { data: Buffer.from(snap.get("data") as Uint8Array), contentType: String(snap.get("contentType")) };
 }
 
 /** Best effort: a leftover image costs almost nothing, a failed save would lose the owner's edit. */
