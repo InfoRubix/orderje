@@ -79,8 +79,8 @@ export function CounterOrder({
               key={c.id}
               onClick={() => setCat(c.id)}
               className={cn(
-                "shrink-0 rounded-full px-4 py-2 text-sm font-semibold",
-                cat === c.id ? "bg-ink text-on-ink" : "border border-line bg-surface text-ink-soft",
+                "shrink-0 rounded-sm border-2 px-3 py-2 text-xs font-bold uppercase tracking-wider",
+                cat === c.id ? "border-edge bg-cta text-on-cta" : "border-line bg-surface text-ink-soft",
               )}
             >
               {c.name}
@@ -93,7 +93,7 @@ export function CounterOrder({
             <button
               key={item.id}
               onClick={() => (item.groups.length ? setPicking(item) : add(item))}
-              className="flex min-h-24 flex-col justify-between rounded-xl border border-line bg-surface p-3 text-left hover:border-pandan active:bg-pandan-soft"
+              className="flex min-h-24 flex-col justify-between rounded-xl border-2 border-edge bg-surface p-3 text-left hover:bg-tag-soft active:bg-pandan-soft"
             >
               <span className="font-semibold leading-snug">{item.name}</span>
               <span className="num mt-2 text-sm font-semibold text-pandan-dark">
@@ -105,7 +105,7 @@ export function CounterOrder({
         </div>
       </section>
 
-      <aside className="h-fit rounded-xl border border-line bg-surface lg:sticky lg:top-6">
+      <aside className="h-fit rounded-xl border-2 border-edge bg-surface lg:sticky lg:top-6">
         <div className="border-b border-line p-4">
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-paper p-1">
             {(["dine_in", "takeaway", "delivery"] as const).map((t) => (
@@ -280,7 +280,7 @@ function OptionsDialog({
           ))}
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Kitchen note" />
           <div className="flex items-center gap-3">
-            <div className="flex items-center rounded-lg border border-line">
+            <div className="flex items-center rounded-md border-2 border-edge">
               <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Less">
                 <Minus className="size-4" />
               </button>

@@ -225,7 +225,7 @@ function CategoryCard({
           </li>
         ))}
         <li className="px-4 py-2.5">
-          <button onClick={onAdd} className="text-sm font-semibold text-pandan-dark hover:underline">
+          <button onClick={onAdd} className="text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
             + Add item to {c.name}
           </button>
         </li>
@@ -248,7 +248,7 @@ function AvailableToggle({ id, available }: { id: string; available: boolean }) 
           await toggleAvailable(id, !on);
         });
       }}
-      className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", on ? "bg-pandan-soft text-pandan-dark" : "bg-chili-soft text-chili")}
+      className={cn("shrink-0 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider", on ? "bg-pandan-soft text-pandan-dark" : "bg-chili text-white")}
     >
       {on ? "Available" : "Sold out"}
     </button>
@@ -355,10 +355,10 @@ function ItemEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal aria-label={item ? `Edit ${item.name}` : "New item"}>
       <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-      <div className="relative flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-2xl bg-surface sm:rounded-2xl">
+      <div className="relative flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-xl border-2 border-edge bg-surface sm:rounded-xl">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="font-display text-xl font-bold">{item ? `Edit ${item.name}` : "New item"}</h2>
-          <button onClick={onClose} className="rounded-full p-1 text-ink-soft hover:bg-paper" aria-label="Close">
+          <button onClick={onClose} className="rounded-sm p-1 text-ink-soft hover:bg-paper" aria-label="Close">
             <X className="size-5" />
           </button>
         </div>
@@ -368,7 +368,7 @@ function ItemEditor({
             <div className="flex flex-wrap items-center gap-4">
               <ItemThumb name={name || "?"} src={photoUrl} className="size-24 text-3xl" />
               <div className="space-y-2">
-                <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-line bg-surface px-4 text-sm font-semibold hover:bg-paper">
+                <label className="inline-flex h-10 cursor-pointer items-center rounded-md border-2 border-edge bg-surface px-4 text-sm font-semibold hover:bg-paper">
                   {photoUrl ? "Change photo" : "Upload photo"}
                   <input type="file" accept="image/*" className="sr-only" aria-label="Upload photo" onChange={(e) => pickPhoto(e.target.files?.[0])} />
                 </label>
@@ -418,7 +418,7 @@ function ItemEditor({
           <div className="space-y-3">
             <p className="text-sm font-medium">Add-ons & choices</p>
             {groups.map((x, gi) => (
-              <div key={gi} className="space-y-2 rounded-lg border border-line p-3">
+              <div key={gi} className="space-y-2 rounded-md border-2 border-edge p-3">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2">
                   <Input value={x.name} onChange={(e) => g(gi, { name: e.target.value })} placeholder="Group, e.g. Panas / Ais" aria-label="Group name" />
                   <label className="flex items-center gap-1.5 text-sm">
@@ -442,7 +442,7 @@ function ItemEditor({
                     </Button>
                   </div>
                 ))}
-                <button type="button" className="text-sm font-semibold text-pandan-dark hover:underline" onClick={() => g(gi, { options: [...x.options, { name: "", price: "" }] })}>
+                <button type="button" className="text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4" onClick={() => g(gi, { options: [...x.options, { name: "", price: "" }] })}>
                   + Option
                 </button>
               </div>

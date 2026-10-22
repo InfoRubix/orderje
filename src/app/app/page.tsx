@@ -89,7 +89,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {open?.n ? (
         <Link
           href="/app/pos"
-          className="mb-5 flex items-center justify-between rounded-xl border border-teh/40 bg-teh-soft px-4 py-3 text-sm font-semibold text-teh"
+          className="mb-5 flex items-center justify-between rounded-xl border-2 border-edge bg-tag px-4 py-3 text-sm font-bold text-[#141414]"
         >
           <span>
             {open.n} bill{open.n === 1 ? "" : "s"} still unpaid or waiting for confirmation
@@ -98,11 +98,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Link>
       ) : null}
 
-      <div className="mb-6 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-pandan p-5 text-white">
-          <p className="text-sm text-white/75">Sales</p>
-          <p className="num font-display text-4xl font-bold">{rm(r.sales)}</p>
-          <p className="mt-1 text-sm text-white/75">
+      <div className="mb-6 grid gap-0.5 overflow-hidden rounded-xl border-2 border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-[#141414] p-5 text-white">
+          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Sales</p>
+          <p className="num font-display text-5xl text-tag">{rm(r.sales)}</p>
+          <p className="mt-1 text-sm text-white/70">
             {r.orders} paid order{r.orders === 1 ? "" : "s"}
           </p>
         </div>
@@ -208,7 +208,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <dd>{rm(r.sales)}</dd>
             </div>
           </dl>
-          <Link href={`/app/recon?date=${to}`} className="mt-4 inline-block text-sm font-semibold text-pandan underline">
+          <Link href={`/app/recon?date=${to}`} className="mt-4 inline-block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
             Reconcile {to === today ? "today" : to}
           </Link>
         </Card>
@@ -220,8 +220,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-surface p-5">
-      <p className="text-sm text-ink-soft">{label}</p>
-      <p className="num font-display text-3xl font-bold">{value}</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">{label}</p>
+      <p className="num font-display text-4xl">{value}</p>
       {sub ? <p className="mt-1 text-sm text-mute">{sub}</p> : null}
     </div>
   );

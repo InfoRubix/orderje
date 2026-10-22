@@ -57,7 +57,7 @@ export function StaffRow({ u, isMe }: { u: U; isMe: boolean }) {
           </p>
           <p className="text-sm text-ink-soft">{u.email}</p>
         </div>
-        <Badge tone={u.role === "owner" ? "dark" : "neutral"} className="capitalize">
+        <Badge tone={u.role === "owner" ? "dark" : "neutral"}>
           {u.role}
         </Badge>
         {!u.active ? <Badge tone="red">Inactive</Badge> : null}

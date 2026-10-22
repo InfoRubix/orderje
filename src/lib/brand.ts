@@ -3,9 +3,9 @@ import { DEFAULT_BRAND_COLOR } from "@/db/schema";
 
 /** Preset brand colours offered in Brand & profile. */
 export const BRAND_PRESETS: [name: string, hex: string][] = [
+  ["Merah papan", "#c22a1e"],
   ["Pandan", "#1f7a4d"],
   ["Teh tarik", "#a8681a"],
-  ["Cili", "#c23a2f"],
   ["Biru laut", "#1f5f9e"],
   ["Ungu", "#6b3fa0"],
   ["Arang", "#2b2f36"],

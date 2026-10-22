@@ -39,14 +39,14 @@ export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) 
 
   if (variant === "bar") {
     return (
-      <nav className="no-print flex gap-1 overflow-x-auto border-t border-line bg-surface px-2 py-1.5 md:hidden">
+      <nav className="no-print flex gap-1 overflow-x-auto border-t-2 border-edge bg-surface px-2 py-1.5 md:hidden">
         {items.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className={cn(
-              "flex min-w-16 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[11px] font-medium",
-              active(href) ? "bg-pandan-soft text-pandan-dark" : "text-ink-soft",
+              "flex min-w-16 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[11px] font-semibold",
+              active(href) ? "bg-tag text-[#141414]" : "text-ink-soft",
             )}
           >
             <Icon className="size-5" aria-hidden />
@@ -64,8 +64,8 @@ export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) 
           key={href}
           href={href}
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-            active(href) ? "bg-white/15 text-white" : "text-white/70 hover:bg-white/10 hover:text-white",
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold",
+            active(href) ? "bg-tag text-[#141414]" : "text-white/70 hover:bg-white/10 hover:text-white",
           )}
         >
           <Icon className="size-4.5" aria-hidden />

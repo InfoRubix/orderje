@@ -34,12 +34,12 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
   return (
     <main className="brand mx-auto min-h-dvh max-w-xl pb-10" style={brandStyle(tenant.brandColor)}>
       <AutoRefresh every={5000} enabled={!done} />
-      <header className="bg-pandan px-5 pb-6 pt-6 text-on-brand">
+      <header className="border-b-[6px] border-tag bg-pandan px-5 pb-6 pt-6 text-on-brand">
         <p className="flex items-center gap-2 text-sm opacity-80">
           <ShopLogo name={tenant.name} src={tenant.logoUrl} className="size-7 rounded-md text-sm" />
           {tenant.name}
         </p>
-        <h1 className="mt-1 font-display text-4xl font-bold">Order #{order.orderNo}</h1>
+        <h1 className="mt-1 font-display text-5xl">Order #{order.orderNo}</h1>
         <p className="mt-1 opacity-85">
           {ORDER_TYPE_LABEL[order.orderType]}
           {order.tableLabel ? `, ${order.tableLabel}` : ""}
@@ -62,9 +62,9 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
                 <li key={s.key} className="text-center">
                   <span
                     className={cn(
-                      "mx-auto grid size-11 place-items-center rounded-full",
+                      "mx-auto grid size-11 place-items-center rounded-sm",
                       reached ? "bg-pandan text-on-brand" : "bg-line text-mute",
-                      i === stepIdx && "ring-4 ring-pandan/20",
+                      i === stepIdx && "ring-4 ring-tag",
                     )}
                   >
                     <Icon className="size-5" aria-hidden />
@@ -111,14 +111,14 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
               <p className="font-semibold text-pandan-dark">
                 {order.paymentStatus === "credit" ? "Charged to your company account." : "Paid. Terima kasih!"}
               </p>
-              <Link href={`/r/${order.publicToken}`} className="mt-1 inline-block text-sm font-semibold text-pandan underline">
+              <Link href={`/r/${order.publicToken}`} className="mt-1 inline-block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
                 View receipt
               </Link>
             </div>
           ) : (
-            <div className="rounded-xl border border-line bg-surface p-5 text-center">
-              <p className="text-sm text-ink-soft">Please pay at the counter</p>
-              <p className="num font-display text-4xl font-bold">{rm(order.total)}</p>
+            <div className="rounded-xl border-2 border-edge bg-surface p-5 text-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">Please pay at the counter</p>
+              <p className="num font-display tag mt-2 text-5xl">{rm(order.total)}</p>
               <p className="mt-1 text-sm text-ink-soft">
                 Cash or DuitNow QR. Show order #{order.orderNo} to the cashier.
               </p>

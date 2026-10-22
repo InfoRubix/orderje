@@ -49,10 +49,10 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex gap-2">
-          <Badge tone={order.status === "cancelled" ? "red" : order.status === "served" ? "neutral" : "amber"} className="capitalize">
+          <Badge tone={order.status === "cancelled" ? "red" : order.status === "served" ? "neutral" : "amber"}>
             {order.status}
           </Badge>
-          <Badge tone={settled ? "green" : "red"} className="capitalize">
+          <Badge tone={settled ? "green" : "red"}>
             {order.paymentStatus === "credit" ? "On credit" : order.paymentStatus}
           </Badge>
         </div>

@@ -17,8 +17,8 @@ export function Breakdown({ rows, total }: { rows: { label: string; value: numbe
                 {rm(r.value)} <span className="font-normal text-mute">{Math.round(share * 100)}%</span>
               </span>
             </div>
-            <div className="h-2 rounded-full bg-line/70">
-              <div className="h-2 rounded-full bg-pandan" style={{ width: `${Math.max(share * 100, r.value ? 1.5 : 0)}%` }} />
+            <div className="h-2.5 rounded-xs bg-line/70">
+              <div className="h-2.5 rounded-xs bg-ink" style={{ width: `${Math.max(share * 100, r.value ? 1.5 : 0)}%` }} />
             </div>
           </li>
         );

@@ -8,8 +8,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { user, tenant } = await requireUser();
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="no-print hidden w-60 shrink-0 flex-col bg-rail p-4 text-white md:flex md:sticky md:top-0 md:h-dvh">
-        <Link href="/app" className="px-3 pb-1 font-display text-xl font-bold">
+      <aside className="no-print hidden w-60 shrink-0 flex-col border-r-4 border-tag bg-rail p-4 text-white md:flex md:sticky md:top-0 md:h-dvh">
+        <Link href="/app" className="px-3 pb-1 font-display text-3xl text-tag">
           OrderJe
         </Link>
         <p className="truncate px-3 pb-5 text-sm text-white/60">{tenant.name}</p>
@@ -24,9 +24,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <header className="no-print flex items-center justify-between bg-rail px-4 py-3 text-white md:hidden">
+      <header className="no-print flex items-center justify-between border-b-4 border-tag bg-rail px-4 py-3 text-white md:hidden">
         <div>
-          <p className="font-display text-lg font-bold leading-none">OrderJe</p>
+          <p className="font-display text-2xl leading-none text-tag">OrderJe</p>
           <p className="text-xs text-white/60">{tenant.name}</p>
         </div>
         <form action={logout}>

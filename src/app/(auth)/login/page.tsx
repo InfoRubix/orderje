@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       {process.env.ALLOW_SIGNUP !== "false" ? (
         <p className="mt-6 text-sm text-ink-soft">
           New kedai?{" "}
-          <Link href="/signup" className="font-semibold text-pandan underline-offset-2 hover:underline">
+          <Link href="/signup" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
             Create an account
           </Link>
         </p>

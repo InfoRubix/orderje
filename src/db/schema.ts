@@ -33,7 +33,8 @@ export type OrderStatus = "new" | "preparing" | "ready" | "served" | "cancelled"
 export type PaymentStatus = "unpaid" | "paid" | "credit";
 export type PaymentMethod = "cash" | "duitnow_qr" | "credit";
 
-export const DEFAULT_BRAND_COLOR = "#1f7a4d";
+/** Signboard red; owners pick their own in Brand & profile. */
+export const DEFAULT_BRAND_COLOR = "#c22a1e";
 
 export type Tenant = {
   id: string;

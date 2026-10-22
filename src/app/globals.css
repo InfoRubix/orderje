@@ -1,53 +1,91 @@
 @import "tailwindcss";
 
 /*
-  OrderJe tokens. Pandan green for go/paid, teh amber for waiting, chili red for problems.
-  Cool paper background, slate ink. Tickets borrow the thermal-receipt look.
+  OrderJe "Papan Tanda": the shopfront signboard. Warm sign-paper, black ink, mustard price tags,
+  signboard red, condensed capitals for headings, near-square corners, 2px black edges on objects.
+  Pandan stays as the "paid / go" colour, teh for waiting, chili for problems.
   Dark mode follows the device. On customer pages, .brand swaps pandan for the kedai's colour.
 */
 @theme {
-  --color-ink: #1d2433;
-  --color-ink-soft: #4b5468;
-  --color-mute: #7b8496;
-  --color-paper: #f5f6f8;
+  --color-ink: #141414;
+  --color-ink-soft: #4a4741;
+  --color-mute: #7a766d;
+  --color-paper: #f4f3ef;
   --color-surface: #ffffff;
-  --color-line: #e2e5eb;
+  --color-line: #dedbd3;
+  --color-edge: #141414;
+  --color-tag: #f2b01e;
+  --color-tag-soft: #fcefc9;
+  --color-sign: #c22a1e;
+  --color-cta: #141414;
+  --color-on-cta: #f2b01e;
   --color-pandan: #1f7a4d;
   --color-pandan-dark: #155c39;
-  --color-pandan-soft: #e3f2ea;
-  --color-teh: #b8741f;
+  --color-pandan-soft: #e2efe6;
+  --color-teh: #a8681a;
   --color-teh-soft: #fbf0df;
-  --color-chili: #c23a2f;
-  --color-chili-soft: #fbe7e5;
+  --color-chili: #c22a1e;
+  --color-chili-soft: #fbe6e3;
   --color-slip: #fffdf7;
-  --color-rail: #1d2433;
+  --color-rail: #141414;
   --color-on-ink: #ffffff;
   --color-on-brand: #ffffff;
 
-  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bricolage Grotesque Variable", "Instrument Sans Variable", ui-sans-serif, sans-serif;
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
+
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-ink: #e8ebf1;
-    --color-ink-soft: #b3bacb;
-    --color-mute: #8a93a6;
-    --color-paper: #12161f;
-    --color-surface: #1a1f2b;
-    --color-line: #2b3242;
+    --color-ink: #f1efe8;
+    --color-ink-soft: #c2bfb6;
+    --color-mute: #8f8b81;
+    --color-paper: #121211;
+    --color-surface: #1c1b19;
+    --color-line: #34322d;
+    --color-edge: #4a4740;
+    --color-tag: #f2b01e;
+    --color-tag-soft: #3a2f12;
+    --color-sign: #d8382b;
+    --color-cta: #f2b01e;
+    --color-on-cta: #141414;
     --color-pandan: #2f9a65;
-    --color-pandan-dark: #6fd3a0;
-    --color-pandan-soft: #173528;
+    --color-pandan-dark: #74d3a3;
+    --color-pandan-soft: #17301f;
     --color-teh: #e2a552;
     --color-teh-soft: #3a2c17;
     --color-chili: #ef6b5f;
     --color-chili-soft: #3d1e1c;
-    --color-slip: #222837;
-    --color-rail: #0c0f15;
-    --color-on-ink: #12161f;
+    --color-slip: #24231f;
+    --color-rail: #0b0b0a;
+    --color-on-ink: #121211;
     color-scheme: dark;
   }
+}
+
+/* Signboard lettering: every display heading is condensed capitals. */
+.font-display {
+  font-stretch: 72%;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+}
+/* A price or label printed on a mustard tag. */
+.tag {
+  display: inline-block;
+  background: var(--color-tag);
+  color: #141414;
+  padding: 1px 6px;
+  font-weight: 800;
 }
 
 /* Customer-facing pages: the kedai's brand colour (set inline as --brand / --on-brand / --brand-shade). */
@@ -76,7 +114,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-pandan);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -84,7 +122,7 @@ body {
 .slip {
   background: var(--color-slip);
   position: relative;
-  box-shadow: 0 1px 0 var(--color-line), 0 6px 14px -10px rgb(29 36 51 / 0.35);
+  box-shadow: 0 1px 0 var(--color-line), 0 6px 14px -10px rgb(20 20 20 / 0.35);
 }
 .slip::after {
   content: "";
@@ -127,10 +165,10 @@ body {
 
 @keyframes arrive {
   from {
-    background-color: var(--color-teh-soft);
+    background-color: var(--color-tag-soft);
   }
   to {
-    background-color: var(--color-slip);
+    background-color: var(--color-surface);
   }
 }
 .arrive {

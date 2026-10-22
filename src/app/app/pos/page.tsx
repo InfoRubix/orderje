@@ -50,11 +50,11 @@ export default async function PosPage() {
               <Link
                 key={o.id}
                 href={`/app/orders/${o.id}`}
-                className="group rounded-xl border border-line bg-surface p-4 hover:border-pandan"
+                className="group rounded-xl border-2 border-edge bg-surface p-4 hover:bg-tag-soft"
               >
                 <div className="flex items-start justify-between">
                   <p className="font-display text-lg font-bold">{o.tableLabel ?? ORDER_TYPE_LABEL[o.orderType]}</p>
-                  <Badge tone={STATUS_TONE[o.status]} className="capitalize">
+                  <Badge tone={STATUS_TONE[o.status]}>
                     {o.status}
                   </Badge>
                 </div>
@@ -66,7 +66,7 @@ export default async function PosPage() {
                 <p className="text-xs text-mute">
                   {CUSTOMER_TYPE_LABEL[o.customerType]} · {o.source === "qr" ? "QR order" : "Counter order"}
                 </p>
-                <p className="mt-3 text-sm font-semibold text-pandan group-hover:underline">Take payment</p>
+                <p className="mt-3 text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">Take payment</p>
               </Link>
             ))}
           </div>
@@ -76,7 +76,7 @@ export default async function PosPage() {
       {recentPaid.length ? (
         <section>
           <h2 className="mb-3 font-display text-lg font-bold">Just paid</h2>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+          <ul className="divide-y divide-line rounded-xl border-2 border-edge bg-surface">
             {recentPaid.map((o) => (
               <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <Link href={`/app/orders/${o.id}`} className="font-semibold hover:underline">
@@ -84,7 +84,7 @@ export default async function PosPage() {
                 </Link>
                 <span className="text-ink-soft">{o.paidMethod ? METHOD_LABEL[o.paidMethod] : ""}</span>
                 <span className="num">{rm(o.total)}</span>
-                <a href={`/r/${o.publicToken}?print=1`} target="_blank" className="font-semibold text-pandan hover:underline">
+                <a href={`/r/${o.publicToken}?print=1`} target="_blank" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
                   Print receipt
                 </a>
               </li>

@@ -134,7 +134,7 @@ with sync_playwright() as p:
         t = one("tenants", name="Kedai Satu")
         state["t1"] = t["_id"]
         state["slug1"] = t["slug"]
-        assert t["slug"] == "kedai-satu" and t["brandColor"] == "#1f7a4d", t
+        assert t["slug"] == "kedai-satu" and t["brandColor"] == "#c22a1e", t
         assert len(docs("tables", t["_id"])) == 3
         assert len(docs("menuItems", t["_id"])) == 13
 

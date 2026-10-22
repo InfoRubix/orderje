@@ -146,7 +146,7 @@ export function PaymentPanel({
             ) : (
               <p className="text-sm text-ink-soft">
                 No {labels[type].toLowerCase()} registered yet.{" "}
-                <a href="/app/customers" className="font-semibold text-pandan underline">
+                <a href="/app/customers" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
                   Add one
                 </a>
               </p>
@@ -200,7 +200,7 @@ export function PaymentPanel({
                   <button
                     key={v}
                     onClick={() => setTendered((v / 100).toFixed(2))}
-                    className="num rounded-lg border border-line py-2 text-sm font-semibold hover:border-pandan"
+                    className="num rounded-md border-2 border-edge py-2 text-sm font-semibold hover:bg-tag-soft"
                   >
                     {v === cashDue ? "Exact" : (v / 100).toFixed(0)}
                   </button>

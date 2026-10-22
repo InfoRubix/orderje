@@ -92,24 +92,24 @@ export function CustomerMenu({
 
   return (
     <div className="brand mx-auto min-h-dvh max-w-xl bg-paper pb-28" style={brandStyle(shop.brandColor)}>
-      <header className="bg-pandan px-5 pb-5 pt-6 text-on-brand">
+      <header className="border-b-[6px] border-tag bg-pandan px-5 pb-5 pt-6 text-on-brand">
         <p className="text-sm opacity-80">{tableLabel ? `You're at ${tableLabel}` : "Takeaway order"}</p>
         <div className="mt-1.5 flex items-center gap-3">
           <ShopLogo name={shop.name} src={shop.logoUrl} className="size-14" />
-          <h1 className="min-w-0 font-display text-3xl font-bold leading-tight">{shop.name}</h1>
+          <h1 className="min-w-0 font-display text-4xl">{shop.name}</h1>
         </div>
         {shop.tagline ? <p className="mt-2 text-sm opacity-90">{shop.tagline}</p> : null}
         {shop.address ? <p className="mt-1 text-xs opacity-75">{shop.address}</p> : null}
       </header>
 
-      <nav className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b border-line bg-paper/95 px-4 py-3 backdrop-blur">
+      <nav className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b-2 border-edge bg-paper px-4 py-3">
         {menu.map((c) => (
           <a
             key={c.id}
             href={`#cat-${c.id}`}
             className={cn(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold",
-              activeCat === c.id ? "bg-ink text-on-ink" : "bg-surface text-ink-soft border border-line",
+              "shrink-0 rounded-sm border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider",
+              activeCat === c.id ? "border-edge bg-cta text-on-cta" : "border-line bg-surface text-ink-soft",
             )}
           >
             {c.name}
@@ -130,8 +130,8 @@ export function CustomerMenu({
           }}
           className="scroll-mt-16 px-4 pt-6"
         >
-          <h2 className="mb-2 font-display text-xl font-bold">{c.name}</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+          <h2 className="mb-2 font-display text-2xl">{c.name}</h2>
+          <ul className="divide-y-2 divide-line overflow-hidden rounded-xl border-2 border-edge bg-surface">
             {c.items.map((item) => {
               const inCart = cart.filter((l) => l.item.id === item.id).reduce((s, l) => s + l.qty, 0);
               return (
@@ -142,16 +142,16 @@ export function CustomerMenu({
                   >
                     <ItemThumb name={item.name} src={item.imageUrl} className="size-18" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{item.name}</p>
+                      <p className="font-bold">{item.name}</p>
                       {item.description ? <p className="line-clamp-2 text-sm text-ink-soft">{item.description}</p> : null}
-                      <p className="num mt-0.5 text-sm font-semibold text-pandan-dark">{rm(item.price)}</p>
+                      <p className="num tag mt-1 text-sm">{rm(item.price)}</p>
                     </div>
                     {inCart ? (
-                      <span className="num grid size-8 place-items-center rounded-full bg-pandan text-sm font-bold text-on-brand">
+                      <span className="num grid size-8 place-items-center rounded-sm bg-cta text-sm font-bold text-on-cta">
                         {inCart}
                       </span>
                     ) : (
-                      <span className="grid size-8 place-items-center rounded-full border border-line text-pandan">
+                      <span className="grid size-8 place-items-center rounded-sm border-2 border-edge text-ink">
                         <Plus className="size-4" aria-hidden />
                       </span>
                     )}
@@ -167,7 +167,7 @@ export function CustomerMenu({
         <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-xl p-3">
           <button
             onClick={() => setCartOpen(true)}
-            className="flex h-14 w-full items-center justify-between rounded-xl bg-ink px-5 text-on-ink shadow-lg"
+            className="flex h-14 w-full items-center justify-between rounded-xl border-2 border-edge bg-cta px-5 text-on-cta"
           >
             <span className="flex items-center gap-2 font-semibold">
               <ShoppingBag className="size-5" aria-hidden /> View order ({count})
@@ -231,10 +231,10 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={title}>
       <button className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-      <div className="relative flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-2xl bg-surface">
+      <div className="relative flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-xl border-x-2 border-t-2 border-edge bg-surface">
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 className="font-display text-xl font-bold">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-1 text-ink-soft hover:bg-paper" aria-label="Close">
+          <h2 className="font-display text-2xl">{title}</h2>
+          <button onClick={onClose} className="rounded-sm p-1 text-ink-soft hover:bg-paper" aria-label="Close">
             <X className="size-5" />
           </button>
         </div>
@@ -246,7 +246,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Stepper({ value, onChange, min = 1 }: { value: number; onChange: (n: number) => void; min?: number }) {
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-line">
+    <div className="flex items-center gap-1 rounded-md border-2 border-edge">
       <button
         type="button"
         className="grid size-10 place-items-center text-ink-soft disabled:opacity-30"
@@ -312,7 +312,7 @@ function ItemSheet({
                 {g.maxSelect > 1 ? `, up to ${g.maxSelect}` : ""}
               </span>
             </legend>
-            <div className="divide-y divide-line rounded-lg border border-line">
+            <div className="divide-y divide-line rounded-md border-2 border-edge">
               {g.options.map((o) => {
                 const on = optionIds.includes(o.id);
                 return (

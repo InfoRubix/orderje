@@ -70,7 +70,7 @@ export function TableCard({
       <div className="mx-auto my-2 w-full max-w-44 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
       <p className="text-sm font-semibold">{caption}</p>
       <div className="no-print mt-3 space-y-2 border-t border-line pt-3 text-left">
-        <a href={url} target="_blank" rel="noreferrer" className="block text-sm font-semibold text-pandan-dark hover:underline">
+        <a href={url} target="_blank" rel="noreferrer" className="block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
           Open as customer
         </a>
         {id ? (

@@ -48,7 +48,7 @@ export function SettingsForm({ t }: { t: T }) {
         </Field>
       </Section>
 
-      <div className="sticky bottom-20 flex items-center gap-3 rounded-xl border border-line bg-surface p-3 md:bottom-4">
+      <div className="sticky bottom-20 flex items-center gap-3 rounded-xl border-2 border-edge bg-surface p-3 md:bottom-4">
         <Button size="lg" disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </Button>

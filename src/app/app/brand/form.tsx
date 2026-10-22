@@ -63,7 +63,7 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
         <Card className="space-y-4 p-5">
           <h2 className="font-display text-lg font-bold">Logo</h2>
           <div className="flex flex-wrap items-center gap-4">
-            <div className="grid size-28 place-items-center overflow-hidden rounded-xl border border-line bg-paper">
+            <div className="grid size-28 place-items-center overflow-hidden rounded-xl border-2 border-edge bg-paper">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt="Current logo" className="size-full object-contain" />
@@ -72,7 +72,7 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
               )}
             </div>
             <div className="space-y-2">
-              <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-line bg-surface px-4 text-sm font-semibold hover:bg-paper">
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-md border-2 border-edge bg-surface px-4 text-sm font-semibold hover:bg-paper">
                 Upload logo
                 <input
                   type="file"
@@ -159,7 +159,7 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
           </div>
         </Card>
 
-        <div className="sticky bottom-20 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 md:bottom-4">
+        <div className="sticky bottom-20 flex flex-wrap items-center gap-3 rounded-xl border-2 border-edge bg-surface p-3 md:bottom-4">
           <Button size="lg" disabled={pending}>
             {pending ? "Saving…" : "Save"}
           </Button>
@@ -170,33 +170,33 @@ export function BrandForm({ t, sample }: { t: Brand; sample: Sample[] }) {
 
       <aside className="space-y-2 lg:sticky lg:top-6">
         <p className="text-sm font-semibold text-ink-soft">Live preview</p>
-        <div className="brand overflow-hidden rounded-[28px] border-4 border-line bg-paper" style={brandStyle(b.brandColor)}>
-          <div className="bg-pandan px-5 pb-5 pt-5 text-on-brand">
+        <div className="brand overflow-hidden rounded-[28px] border-[6px] border-[#141414] bg-paper" style={brandStyle(b.brandColor)}>
+          <div className="border-b-[6px] border-tag bg-pandan px-5 pb-5 pt-5 text-on-brand">
             <p className="text-sm opacity-80">You&apos;re at Meja 3</p>
             <div className="mt-1.5 flex items-center gap-3">
               <ShopLogo name={b.name || "?"} src={preview} className="size-12" />
-              <p className="min-w-0 font-display text-2xl font-bold leading-tight">{b.name || "Your kedai"}</p>
+              <p className="min-w-0 font-display text-3xl">{b.name || "Your kedai"}</p>
             </div>
             {b.tagline ? <p className="mt-2 text-sm opacity-90">{b.tagline}</p> : null}
           </div>
           <div className="space-y-3 p-3">
             {sample.length ? (
-              <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+              <ul className="divide-y-2 divide-line overflow-hidden rounded-xl border-2 border-edge bg-surface">
                 {sample.map((i) => (
                   <li key={i.id} className="flex items-center gap-3 px-3 py-2.5">
                     <ItemThumb name={i.name} src={i.imageUrl} className="size-12" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{i.name}</p>
-                      <p className="num text-sm font-semibold text-pandan-dark">{rm(i.price)}</p>
+                      <p className="truncate text-sm font-bold">{i.name}</p>
+                      <p className="num tag mt-0.5 text-xs">{rm(i.price)}</p>
                     </div>
-                    <span className="grid size-7 place-items-center rounded-full border border-line text-pandan">+</span>
+                    <span className="grid size-7 place-items-center rounded-sm border-2 border-edge font-bold">+</span>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="rounded-xl border border-dashed border-line p-4 text-sm text-mute">Add menu items to see them here.</p>
             )}
-            <div className="grid h-11 place-items-center rounded-lg bg-pandan text-sm font-semibold text-on-brand">
+            <div className="grid h-11 place-items-center rounded-xl bg-cta text-sm font-bold text-on-cta">
               Send order to kitchen
             </div>
           </div>

@@ -58,7 +58,7 @@ export function BarChart({
                 aria-label={`${d.label}: ${rm(d.value)}${d.sub ? `, ${d.sub}` : ""}`}
               >
                 <span
-                  className="w-full rounded-t-[4px] bg-pandan transition-opacity"
+                  className="w-full rounded-t-[1px] bg-ink transition-opacity"
                   style={{
                     height: `${(d.value / nice) * 100}%`,
                     minHeight: d.value > 0 ? 2 : 0,

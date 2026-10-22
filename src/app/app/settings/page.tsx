@@ -17,7 +17,7 @@ export default async function SettingsPage() {
       />
       <p className="mb-5 text-sm text-ink-soft">
         Kedai name, logo, colour and receipt message are under{" "}
-        <Link href="/app/brand" className="font-semibold text-pandan-dark underline">
+        <Link href="/app/brand" className="font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4">
           Brand &amp; profile
         </Link>
         .

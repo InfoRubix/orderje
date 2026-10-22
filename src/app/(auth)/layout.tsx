@@ -3,12 +3,12 @@ import Link from "next/link";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="grid min-h-dvh md:grid-cols-[1fr_minmax(0,520px)]">
-      <section className="relative hidden overflow-hidden bg-pandan p-12 text-white md:flex md:flex-col md:justify-between">
-        <Link href="/" className="font-display text-2xl font-bold">
+      <section className="relative hidden overflow-hidden border-r-[6px] border-tag bg-sign p-12 text-white md:flex md:flex-col md:justify-between">
+        <Link href="/" className="font-display text-4xl text-tag">
           OrderJe
         </Link>
         <div className="max-w-md">
-          <p className="font-display text-4xl font-bold leading-tight">
+          <p className="font-display text-6xl">
             Scan, order, makan. The counter just collects.
           </p>
           <p className="mt-4 text-white/80">

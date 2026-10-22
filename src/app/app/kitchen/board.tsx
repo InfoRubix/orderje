@@ -95,7 +95,7 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold md:text-3xl">Kitchen</h1>
+          <h1 className="font-display text-3xl md:text-4xl">Kitchen</h1>
           <p className="text-sm text-ink-soft">
             {offline ? <span className="font-semibold text-chili">Connection lost, retrying…</span> : "Updates every few seconds."}
           </p>
@@ -125,9 +125,9 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
             const list = tickets.filter((t) => t.status === col.status);
             return (
               <section key={col.status} aria-label={col.title}>
-                <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-bold">
+                <h2 className="mb-3 flex items-center gap-2 font-display text-xl">
                   {col.title}
-                  <span className="num rounded-md bg-ink px-2 text-sm text-on-ink">{list.length}</span>
+                  <span className="num rounded-md bg-tag px-2 text-sm text-[#141414]">{list.length}</span>
                 </h2>
                 <div className="space-y-5">
                   {list.length === 0 ? (
@@ -136,10 +136,10 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
                     list.map((t) => {
                       const mins = Math.max(0, Math.floor((now - t.createdAt) / 60000));
                       return (
-                        <article key={t.id} className={cn("slip rounded-t-lg px-4 pb-4 pt-3", fresh.has(t.id) && "arrive")}>
+                        <article key={t.id} className={cn("rounded-xl border-2 border-edge bg-surface px-4 pb-4 pt-3", fresh.has(t.id) && "arrive")}>
                           <header className="flex items-start justify-between gap-2 border-b border-dashed border-line pb-2">
                             <div>
-                              <p className="num font-display text-2xl font-bold leading-none">#{t.orderNo}</p>
+                              <p className="num font-display text-4xl leading-none">#{t.orderNo}</p>
                               <p className="mt-1 text-sm font-semibold">
                                 {t.tableLabel ?? ORDER_TYPE_LABEL[t.orderType]}
                                 {t.customerName ? ` · ${t.customerName}` : ""}

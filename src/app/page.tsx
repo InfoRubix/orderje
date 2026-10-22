@@ -10,7 +10,7 @@ export default async function Home() {
   return (
     <main className="min-h-dvh">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <span className="font-display text-2xl font-bold">OrderJe</span>
+        <span className="rounded-md bg-[#141414] px-3 py-1 font-display text-3xl text-tag">OrderJe</span>
         <Link href="/login" className={buttonVariants({ variant: "secondary" })}>
           Log in
         </Link>
@@ -18,7 +18,7 @@ export default async function Home() {
 
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-8 md:grid-cols-[1.1fr_1fr]">
         <div>
-          <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
+          <h1 className="font-display text-6xl md:text-7xl">
             Customers order from the table. You just cook and collect.
           </h1>
           <p className="mt-5 max-w-lg text-lg text-ink-soft">
@@ -68,7 +68,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="border-t border-line bg-surface">
+      <section className="border-t-2 border-edge bg-surface">
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 md:grid-cols-3">
           {[
             ["Order from the table", "Every table gets its own QR. Customers pick add-ons like ais or kurang manis, and the order lands in the kitchen tagged with the table."],
@@ -76,7 +76,7 @@ export default async function Home() {
             ["Close the day in minutes", "Count the drawer, check the bank app, and see exactly where cash or QR is short or over."],
           ].map(([t, d]) => (
             <div key={t}>
-              <h2 className="font-display text-xl font-bold">{t}</h2>
+              <h2 className="font-display text-2xl">{t}</h2>
               <p className="mt-2 text-ink-soft">{d}</p>
             </div>
           ))}

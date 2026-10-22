@@ -33,7 +33,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       {list.length === 0 ? (
         <Empty title="No orders on this day" />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+        <div className="overflow-x-auto rounded-xl border-2 border-edge bg-surface">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-line text-left text-ink-soft">
               <tr>
@@ -64,7 +64,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   <td className="px-4 py-2.5 uppercase text-ink-soft">{o.source}</td>
                   <td className="px-4 py-2.5 capitalize">{o.status}</td>
                   <td className="px-4 py-2.5">
-                    <Badge tone={o.status === "cancelled" ? "neutral" : PAY_TONE[o.paymentStatus]} className="capitalize">
+                    <Badge tone={o.status === "cancelled" ? "neutral" : PAY_TONE[o.paymentStatus]}>
                       {o.status === "cancelled" ? "—" : o.paymentStatus === "credit" ? "on credit" : o.paymentStatus}
                     </Badge>
                   </td>

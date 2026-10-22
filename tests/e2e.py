@@ -76,14 +76,14 @@ with sync_playwright() as p:
     page.fill("input[name=tagline]", "Mamak 24 jam sejak 1998")
     page.fill("input[name=address]", "12, Jalan 8/35, Seri Bangi")
     page.fill("input[name=phone]", "03-8920 1234")
-    page.get_by_role("button", name="Cili").click()
+    page.get_by_role("button", name="Biru laut").click()
     page.set_input_files("input[aria-label='Upload logo']", QR)
     expect(page.get_by_alt_text("Current logo")).to_be_visible()
     page.screenshot(path=f"{SHOTS}/00-brand.png", full_page=True)
     page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Saved. Customers see it straight away.")).to_be_visible()
     t = one("tenants")
-    assert (t["brandColor"], t["tagline"]) == ("#c23a2f", "Mamak 24 jam sejak 1998"), t
+    assert (t["brandColor"], t["tagline"]) == ("#1f5f9e", "Mamak 24 jam sejak 1998"), t
     logo = urllib.request.urlopen(BASE + t["logoUrl"])
     assert logo.status == 200 and logo.headers["Content-Type"] == "image/png", t["logoUrl"]
     assert len(docs("images", tenantId=t["_id"])) == 1
