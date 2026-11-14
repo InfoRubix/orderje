@@ -3,7 +3,7 @@ import { col, fs } from "@/db";
 import type { MenuItem } from "@/db/schema";
 import { token, uid } from "./utils";
 
-type SeedItem = { name: string; price: number; desc?: string; groups?: { name: string; required: boolean; max: number; options: [string, number][] }[] };
+type SeedItem = { name: string; price: number; openPrice?: boolean; skipKitchen?: boolean; desc?: string; groups?: { name: string; required: boolean; max: number; options: [string, number][] }[] };
 
 const SAMPLE: { category: string; items: SeedItem[] }[] = [
   {
@@ -18,6 +18,8 @@ const SAMPLE: { category: string; items: SeedItem[] }[] = [
         ],
       },
       { name: "Nasi Goreng Kampung", price: 750 },
+      // Customers take their own dishes; the cashier keys in the total when they pay.
+      { name: "Nasi Campur", price: 0, openPrice: true, skipKitchen: true, desc: "Ambil sendiri, harga ikut lauk" },
       {
         name: "Mee Goreng Mamak",
         price: 700,
@@ -67,6 +69,8 @@ export async function seedSampleMenu(tenantId: string) {
         name: it.name,
         description: it.desc ?? null,
         price: it.price,
+        openPrice: it.openPrice ?? false,
+        skipKitchen: it.skipKitchen ?? false,
         imageUrl: null,
         imagePath: null,
         available: true,

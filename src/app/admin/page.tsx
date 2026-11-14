@@ -4,6 +4,7 @@ import { col, readAll } from "@/db";
 import type { Tenant } from "@/db/schema";
 import { getSession, isSuperAdmin } from "@/lib/auth";
 import { fmtDateTime } from "@/lib/time";
+import { ADDONS, isAddonKey } from "@/lib/plans";
 import { Badge, Button, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Rubix admin" };
@@ -22,6 +23,23 @@ async function toggleTenant(f: FormData) {
   const active = f.get("active") === "true";
   const ref = col.tenants().doc(id);
   if ((await ref.get()).exists) await ref.update({ active });
+  revalidatePath("/admin");
+}
+
+async function toggleAddon(f: FormData) {
+  "use server";
+  await guard();
+  const id = String(f.get("id"));
+  const key = f.get("key");
+  if (!isAddonKey(key)) return;
+  const on = f.get("on") === "true";
+  const ref = col.tenants().doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const cur = new Set<string>((snap.get("addons") as string[] | undefined) ?? []);
+  if (on) cur.add(key);
+  else cur.delete(key);
+  await ref.update({ addons: [...cur] });
   revalidatePath("/admin");
 }
 
@@ -44,13 +62,14 @@ export default async function AdminPage() {
     <main className="mx-auto max-w-5xl p-6 md:p-10">
       <PageHeader title="Kedai on OrderTerus" sub={`${n} accounts. Suspending a kedai blocks its logins and QR ordering.`} />
       <div className="overflow-x-auto rounded-xl border-2 border-edge bg-surface">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b border-line text-left text-ink-soft">
             <tr>
               <th className="px-4 py-2.5 font-medium">Kedai</th>
               <th className="px-4 py-2.5 font-medium">Joined</th>
               <th className="px-4 py-2.5 text-right font-medium">Orders (30d)</th>
               <th className="px-4 py-2.5 text-right font-medium">Logins</th>
+              <th className="px-4 py-2.5 font-medium">Add-ons</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5" />
             </tr>
@@ -67,6 +86,23 @@ export default async function AdminPage() {
                 <td className="px-4 py-2.5">{fmtDateTime(t.createdAt)}</td>
                 <td className="num px-4 py-2.5 text-right">{Number(orders30)}</td>
                 <td className="num px-4 py-2.5 text-right">{Number(staff)}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {ADDONS.map((a) => {
+                      const on = (t.addons ?? []).includes(a.key);
+                      return (
+                        <form key={a.key} action={toggleAddon}>
+                          <input type="hidden" name="id" value={t.id} />
+                          <input type="hidden" name="key" value={a.key} />
+                          <input type="hidden" name="on" value={String(!on)} />
+                          <Button size="sm" variant={on ? "primary" : "secondary"} aria-pressed={on} title={on ? "On: click to switch off" : "Off: click to switch on"}>
+                            {a.name}
+                          </Button>
+                        </form>
+                      );
+                    })}
+                  </div>
+                </td>
                 <td className="px-4 py-2.5">{t.active ? <Badge tone="green">Active</Badge> : <Badge tone="red">Suspended</Badge>}</td>
                 <td className="px-4 py-2.5 text-right">
                   <form action={toggleTenant}>

@@ -49,6 +49,11 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
             {order.customerName ? ` · ${order.customerName}` : ""}
             {order.customerPhone ? ` · ${order.customerPhone}` : ""}
           </p>
+          {order.queuedAt ? (
+            <p className="text-sm font-semibold text-chili">
+              {t("Taken offline at {time}, sent when the internet came back.", { time: fmtDateTime(order.queuedAt, tenant.language) })}
+            </p>
+          ) : null}
         </div>
         <div className="flex gap-2">
           <Badge tone={order.status === "cancelled" ? "red" : order.status === "served" ? "neutral" : "amber"}>

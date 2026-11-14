@@ -17,6 +17,8 @@ export default async function MenuPage() {
       description: i.description,
       imageUrl: i.imageUrl,
       available: i.available,
+      openPrice: i.openPrice,
+      skipKitchen: i.skipKitchen,
       categoryId: i.categoryId,
       groups: i.groups.map((g) => ({
         name: g.name,

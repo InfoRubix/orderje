@@ -14,6 +14,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   ]);
   return (
     <CounterOrder
+      tenantId={tenant.id}
       menu={menu}
       tables={tables}
       defaultTable={table}

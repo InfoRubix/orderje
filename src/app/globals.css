@@ -229,3 +229,17 @@ body {
 .arrive {
   animation: arrive 2.5s ease-out;
 }
+
+/* "Your order is ready" banner and fresh numbers on the calling screen. */
+@keyframes ready-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+.ready-pulse {
+  animation: ready-pulse 1.2s ease-in-out infinite;
+}

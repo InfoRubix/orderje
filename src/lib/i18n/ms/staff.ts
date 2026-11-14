@@ -106,10 +106,43 @@ const dict: Record<string, string> = {
   "Phone (optional)": "Telefon (pilihan)",
   "Tap items to add them.": "Tekan item untuk tambah.",
   "Order note": "Nota pesanan",
-  "Member, staff or corporate pricing is applied on the payment screen.":
-    "Harga ahli, staf atau korporat dikira di skrin bayaran.",
   "Sending…": "Menghantar…",
   "Send to kitchen & bill": "Hantar ke dapur & bil",
+  "Key in price": "Taip harga",
+  "Pay now · {amount}": "Bayar sekarang · {amount}",
+  "Pay now is walk-in pricing. For member, staff or corporate, use Send to kitchen & bill.":
+    "Bayar sekarang guna harga pelanggan biasa. Untuk ahli, staf atau korporat, guna Hantar ke dapur & bil.",
+  "DuitNow QR needs internet. Take cash, or bill it later.": "DuitNow QR perlukan internet. Terima tunai, atau bil kemudian.",
+  "Order #{n} is in, but not paid: {reason}": "Pesanan #{n} sudah masuk, tapi belum dibayar: {reason}",
+  "Open the bill": "Buka bil",
+  "Paid in cash and saved on this device. Tell the kitchen now; it's sent to the system when the internet is back.":
+    "Dibayar tunai dan disimpan dalam peranti ini. Beritahu dapur sekarang; ia dihantar ke sistem bila internet pulih.",
+  "Paid · Order #{n}": "Dibayar · Pesanan #{n}",
+  "Enter the price": "Masukkan harga",
+  "What's on the plate (optional)": "Lauk apa dalam pinggan (pilihan)",
+
+  // offline counter orders
+  "Save order on this device": "Simpan pesanan dalam peranti ini",
+  "No internet, and this browser won't save the order. Write it down for now.":
+    "Tiada internet, dan pelayar ini tak dapat simpan pesanan. Tulis dulu buat masa ini.",
+  "Saved on this device: {label}, {total}. Tell the kitchen now; it's sent to the system when the internet is back.":
+    "Disimpan dalam peranti ini: {label}, {total}. Beritahu dapur sekarang; ia dihantar ke sistem bila internet pulih.",
+  "No internet.": "Tiada internet.",
+  "You can still take counter orders. They're saved on this device and go to the kitchen when the internet is back.":
+    "Anda masih boleh ambil pesanan di kaunter. Ia disimpan dalam peranti ini dan dihantar ke dapur bila internet pulih.",
+  "Sending saved orders…": "Menghantar pesanan yang disimpan…",
+  "1 order saved on this device, waiting for internet.": "1 pesanan disimpan dalam peranti ini, menunggu internet.",
+  "{n} orders saved on this device, waiting for internet.": "{n} pesanan disimpan dalam peranti ini, menunggu internet.",
+  "Send now": "Hantar sekarang",
+  "Saved order not sent: {label}, {total}": "Pesanan tersimpan tak dapat dihantar: {label}, {total}",
+  "1 item, taken at {time}": "1 item, diambil pada {time}",
+  "{n} items, taken at {time}": "{n} item, diambil pada {time}",
+  "Try again": "Cuba lagi",
+  "Delete this saved order? It will not reach the kitchen or the reports.":
+    "Padam pesanan tersimpan ini? Ia tak akan sampai ke dapur atau laporan.",
+  Offline: "Luar talian",
+  "Taken offline at {time}. Check it wasn't cooked already.": "Diambil semasa tiada internet pada {time}. Semak jika sudah dimasak.",
+  "Taken offline at {time}, sent when the internet came back.": "Diambil semasa tiada internet pada {time}, dihantar bila internet pulih.",
   "(required)": "(wajib)",
   "(optional)": "(pilihan)",
   "Kitchen note": "Nota untuk dapur",
@@ -124,6 +157,40 @@ const dict: Record<string, string> = {
   "Sound on": "Bunyi hidup",
   "Turn on sound": "Hidupkan bunyi",
   "Full screen": "Skrin penuh",
+
+  // calling screen
+  "Calling screen": "Skrin panggilan",
+  "Being made": "Sedang disediakan",
+  "Ready to collect": "Sedia diambil",
+  "Nothing ready yet.": "Belum ada yang siap.",
+
+  // support and plan
+  "Help on WhatsApp": "Bantuan di WhatsApp",
+  Help: "Bantuan",
+  Plan: "Pelan",
+  "What your kedai gets, and the extras you can add.": "Apa yang kedai anda dapat, dan tambahan yang boleh dipasang.",
+  Free: "Percuma",
+  "Your plan": "Pelan anda",
+  "No time limit and no card needed. Use it as long as you like.": "Tiada had masa dan tak perlu kad. Gunalah selama mana anda mahu.",
+  "QR menu for every table, plus a takeaway QR": "Menu QR untuk setiap meja, dan QR bungkus",
+  "Kitchen screen and calling screen": "Skrin dapur dan skrin panggilan",
+  "Counter: pay now, bills, cash and DuitNow QR": "Kaunter: bayar terus, bil, tunai dan DuitNow QR",
+  "Keeps taking counter orders when the internet drops": "Kaunter masih boleh ambil order bila internet putus",
+  "Member, staff and corporate pricing": "Harga ahli, staf dan korporat",
+  "Dashboard and end-of-day recon": "Papan pemuka dan rekon hujung hari",
+  "Unlimited orders, staff logins and tables": "Order, login staf dan meja tanpa had",
+  "Add-ons": "Tambahan",
+  "Paid extras, switched on by Rubix. WhatsApp us for the price.": "Tambahan berbayar, dibuka oleh Rubix. WhatsApp kami untuk harga.",
+  "Coming soon": "Akan datang",
+  "Ask Rubix": "Tanya Rubix",
+  "Ask for the price": "Tanya harga",
+  "Tell me when it's ready": "Beritahu saya bila sedia",
+  "Supplier invoices": "Invois pembekal",
+  "Record invoices from your suppliers, what you owe each one and when it's paid.":
+    "Rekod invois daripada pembekal, berapa hutang setiap pembekal dan bila dibayar.",
+  "Petty cash": "Petty cash",
+  "Track the kedai's petty cash: daily spending, receipts and the balance in the box.":
+    "Jejak petty cash kedai: belanja harian, resit dan baki dalam kotak.",
   "Loading orders…": "Memuatkan pesanan…",
   "No new orders": "Tiada pesanan baru",
   "Nothing here": "Tiada apa-apa",

@@ -25,6 +25,7 @@
  */
 
 import type { Lang } from "@/lib/i18n";
+import type { AddonKey } from "@/lib/plans";
 
 export type Role = "owner" | "cashier" | "kitchen";
 export type OrderType = "dine_in" | "takeaway" | "delivery";
@@ -60,6 +61,8 @@ export type Tenant = {
   receiptFooter: string | null;
   orderSeq: number;
   active: boolean;
+  /** Paid add-ons Rubix has switched on for this kedai (see src/lib/plans.ts). Missing = none. */
+  addons?: AddonKey[];
   createdAt: Date;
 };
 
@@ -95,7 +98,18 @@ export type MenuItem = {
   categoryId: string;
   name: string;
   description: string | null;
+  /** In sen. For an open-price item, the usual price shown as a hint at the counter (0 = none). */
   price: number;
+  /**
+   * The cashier types the price for each order (nasi campur, lauk by the portion). Counter only:
+   * these items are hidden from the QR menu. Missing on older items = false.
+   */
+  openPrice?: boolean;
+  /**
+   * Handed over at the counter (nasi campur, canned drinks), so counter orders don't put it on
+   * the kitchen board. QR orders still show it there, since someone has to see them. Missing = false.
+   */
+  skipKitchen?: boolean;
   imageUrl: string | null;
   imagePath: string | null;
   available: boolean;
@@ -134,6 +148,8 @@ export type OrderItem = {
   unitPrice: number;
   qty: number;
   lineTotal: number;
+  /** false when this line skips the kitchen board (see MenuItem.skipKitchen). Missing = true. */
+  kitchen?: boolean;
 };
 
 export type Order = {
@@ -162,6 +178,12 @@ export type Order = {
   note: string | null;
   items: OrderItem[];
   createdAt: Date;
+  /**
+   * Set when the counter took the order with no internet: the time on the device. createdAt is
+   * when it reached the server, so reports and recon still count it on the day it was sent.
+   * Missing on older orders.
+   */
+  queuedAt?: Date | null;
   paidAt: Date | null;
 };
 

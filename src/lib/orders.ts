@@ -34,12 +34,16 @@ export async function listMenuItems(tenantId: string) {
     .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
 }
 
-export async function loadMenu(tenantId: string, opts: { includeUnavailable?: boolean } = {}) {
+export async function loadMenu(tenantId: string, opts: { includeUnavailable?: boolean; forCustomers?: boolean } = {}) {
   const [cats, items] = await Promise.all([listCategories(tenantId), listMenuItems(tenantId)]);
   return cats
     .map((c: Category) => ({
       ...c,
-      items: items.filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available)),
+      items: items
+        .filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available))
+        // Customers can't set their own price, so open-price items stay at the counter.
+        .filter((i) => !(opts.forCustomers && i.openPrice))
+        .map((i) => ({ ...i, openPrice: i.openPrice ?? false, skipKitchen: i.skipKitchen ?? false })),
     }))
     .filter((c) => opts.includeUnavailable || c.items.length > 0);
 }
@@ -49,7 +53,17 @@ export type MenuItemFull = Menu[number]["items"][number];
 
 /* --------------------------------- Orders --------------------------------- */
 
-export type OrderLineInput = { menuItemId: string; qty: number; optionIds: string[]; note?: string };
+export type OrderLineInput = {
+  menuItemId: string;
+  qty: number;
+  optionIds: string[];
+  note?: string;
+  /** Sen, typed by the cashier. Used only for open-price items; ignored for everything else. */
+  price?: number;
+};
+
+/** Highest price the counter may type for one open-price item. */
+export const MAX_OPEN_PRICE = 100_000; // RM 1,000
 
 export type CreateOrderInput = {
   tenantId: string;
@@ -62,10 +76,21 @@ export type CreateOrderInput = {
   customerPhone?: string | null;
   note?: string | null;
   lines: OrderLineInput[];
+  /**
+   * Order id made on the device. Sending the same id twice returns the first order instead of
+   * making a second one, so an offline order can be retried until it gets through.
+   */
+  clientId?: string;
+  /** When the counter took the order offline; set only for orders sent from the device's queue. */
+  queuedAt?: Date | null;
 };
 
 /** Prices every line from the database, never from the client. */
-async function priceLines(tenantId: string, lines: OrderLineInput[]) {
+async function priceLines(
+  tenantId: string,
+  lines: OrderLineInput[],
+  opts: { allowSoldOut?: boolean; source: "qr" | "counter" },
+) {
   if (!lines.length) throw new OrderError("Add at least one item.");
   if (lines.length > 100) throw new OrderError("Too many items in one order.");
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))];
@@ -75,7 +100,8 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
   return lines.map((l) => {
     const item = items.find((i) => i.id === l.menuItemId);
     if (!item) throw new OrderError("An item in your cart is no longer on the menu.");
-    if (!item.available) throw new OrderError("{name} is sold out.", { name: item.name });
+    // An offline order was already served; marking the item sold out since then mustn't lose the sale.
+    if (!item.available && !opts.allowSoldOut) throw new OrderError("{name} is sold out.", { name: item.name });
     const qty = Math.trunc(l.qty);
     if (!(qty >= 1 && qty <= 99)) throw new OrderError("Quantity must be between 1 and 99.");
 
@@ -91,7 +117,14 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
       if (g.required && n === 0) throw new OrderError("Choose {group} for {name}.", { group: g.name, name: item.name });
       if (n > g.maxSelect) throw new OrderError("Pick up to {max} for {group}.", { max: g.maxSelect, group: g.name });
     }
-    const unitPrice = item.price + chosen.reduce((s, c) => s + c.o.price, 0);
+    let base = item.price;
+    if (item.openPrice) {
+      if (opts.source !== "counter") throw new OrderError("{name} is priced at the counter. Please order it there.", { name: item.name });
+      const p = Number(l.price);
+      if (!Number.isInteger(p) || p < 1 || p > MAX_OPEN_PRICE) throw new OrderError("Enter the price for {name}.", { name: item.name });
+      base = p;
+    }
+    const unitPrice = base + chosen.reduce((s, c) => s + c.o.price, 0);
     return {
       id: uid(),
       menuItemId: item.id,
@@ -101,6 +134,7 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
       unitPrice,
       qty,
       lineTotal: unitPrice * qty,
+      kitchen: !(opts.source === "counter" && item.skipKitchen),
     };
   });
 }
@@ -127,16 +161,27 @@ export async function createOrder(input: CreateOrderInput) {
 
   const customerType = input.customerType ?? "walk_in";
   const customer = await resolveCustomer(tenant.id, customerType, input.customerId);
-  const items = await priceLines(tenant.id, input.lines);
+  const orderId = input.clientId ?? uid();
+  const orderRef = col.of(tenant.id, "orders").doc(orderId);
+  // Fast path for a retry whose first attempt got through (the reply was lost on a bad connection).
+  const existing = read<Order>(await orderRef.get());
+  if (existing) return { id: existing.id, publicToken: existing.publicToken };
+
+  const items = await priceLines(tenant.id, input.lines, { allowSoldOut: Boolean(input.queuedAt), source: input.source });
   const subtotal = items.reduce((s, l) => s + l.lineTotal, 0);
   const totals = computeTotals(tenant, subtotal, customerType, input.orderType);
 
-  const orderId = uid();
-  const publicToken = token(20);
+  let publicToken = token(20);
   const tenantRef = col.tenants().doc(tenant.id);
 
   await fs().runTransaction(async (tx) => {
-    const seq = Number((await tx.get(tenantRef)).get("orderSeq") ?? 0) + 1;
+    const [tenantSnap, orderSnap] = await Promise.all([tx.get(tenantRef), tx.get(orderRef)]);
+    if (orderSnap.exists) {
+      // Two retries of the same offline order raced each other; keep the first.
+      publicToken = String(orderSnap.get("publicToken"));
+      return;
+    }
+    const seq = Number(tenantSnap.get("orderSeq") ?? 0) + 1;
     tx.update(tenantRef, { orderSeq: seq });
     const order: Omit<Order, "id"> = {
       tenantId: tenant.id,
@@ -150,16 +195,18 @@ export async function createOrder(input: CreateOrderInput) {
       customerId: customer?.id ?? null,
       customerName: input.customerName?.trim().slice(0, 120) || customer?.name || null,
       customerPhone: input.customerPhone?.trim().slice(0, 32) || customer?.phone || null,
-      status: "new",
+      // Nothing for the kitchen to make (e.g. only nasi campur): it was handed over already.
+      status: items.some((i) => i.kitchen) ? "new" : "served",
       paymentStatus: "unpaid",
       ...totals,
       rounding: 0,
       note: input.note?.trim().slice(0, 255) || null,
       items,
       createdAt: new Date(),
+      queuedAt: input.queuedAt ?? null,
       paidAt: null,
     };
-    tx.create(col.of(tenant.id, "orders").doc(orderId), order);
+    tx.create(orderRef, order);
     tx.create(col.orderTokens().doc(publicToken), { tenantId: tenant.id, orderId });
   });
 

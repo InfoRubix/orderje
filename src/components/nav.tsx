@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BadgeCheck,
   BarChart3,
   ChefHat,
   ClipboardList,
   Bot,
   Contact,
+  Monitor,
   Palette,
   QrCode,
   Scale,
@@ -24,6 +26,7 @@ const ITEMS = [
   { href: "/app", label: "Dashboard", icon: BarChart3, roles: ["owner"] },
   { href: "/app/pos", label: "Counter", icon: Store, roles: ["owner", "cashier"] },
   { href: "/app/kitchen", label: "Kitchen", icon: ChefHat, roles: ["owner", "cashier", "kitchen"] },
+  { href: "/app/display", label: "Calling screen", icon: Monitor, roles: ["owner", "cashier", "kitchen"] },
   { href: "/app/orders", label: "Orders", icon: ClipboardList, roles: ["owner", "cashier"] },
   { href: "/app/recon", label: "Recon", icon: Scale, roles: ["owner", "cashier"] },
   { href: "/app/brand", label: "Brand & profile", icon: Palette, roles: ["owner"] },
@@ -33,6 +36,7 @@ const ITEMS = [
   { href: "/app/customers", label: "Customers", icon: Contact, roles: ["owner", "cashier"] },
   { href: "/app/staff", label: "Staff", icon: Users, roles: ["owner"] },
   { href: "/app/settings", label: "Settings", icon: Settings, roles: ["owner"] },
+  { href: "/app/plan", label: "Plan", icon: BadgeCheck, roles: ["owner"] },
 ] as const;
 
 export function Nav({ role, variant }: { role: Role; variant: "rail" | "bar" }) {

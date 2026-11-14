@@ -136,7 +136,7 @@ with sync_playwright() as p:
         state["slug1"] = t["slug"]
         assert t["slug"] == "kedai-satu" and t["brandColor"] == "#d92d20", t
         assert len(docs("tables", t["_id"])) == 3
-        assert len(docs("menuItems", t["_id"])) == 13
+        assert len(docs("menuItems", t["_id"])) == 14  # includes Nasi Campur (open price)
 
     @check("Signup: duplicate email and taken link name are refused")
     def _():

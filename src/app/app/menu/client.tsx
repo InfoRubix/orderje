@@ -28,6 +28,8 @@ export type EditorItem = {
   description: string | null;
   imageUrl: string | null;
   available: boolean;
+  openPrice: boolean;
+  skipKitchen: boolean;
   categoryId: string;
   groups: Group[];
 };
@@ -226,9 +228,16 @@ function CategoryCard({
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{i.name}</p>
               <p className="truncate text-sm text-ink-soft">
-                <span className="num">{rm(i.price)}</span>
+                {i.openPrice ? (
+                  <span className="font-semibold text-teh">
+                    {i.price ? t("Price at counter (usually {price})", { price: rm(i.price) }) : t("Price at counter")}
+                  </span>
+                ) : (
+                  <span className="num">{rm(i.price)}</span>
+                )}
                 {i.description ? ` · ${i.description}` : ""}
               </p>
+              {i.skipKitchen ? <p className="text-xs font-semibold text-ink-soft">{t("Not sent to kitchen")}</p> : null}
               {i.groups.length ? (
                 <p className="truncate text-xs text-mute">{i.groups.map((g) => g.name + (g.required ? ` (${t("required")})` : "")).join(", ")}</p>
               ) : null}
@@ -288,7 +297,9 @@ function ItemEditor({
 }) {
   const t = useT();
   const [name, setName] = useState(item?.name ?? "");
-  const [price, setPrice] = useState(item ? (item.price / 100).toFixed(2) : "");
+  const [price, setPrice] = useState(item && item.price ? (item.price / 100).toFixed(2) : "");
+  const [openPrice, setOpenPrice] = useState(item?.openPrice ?? false);
+  const [skipKitchen, setSkipKitchen] = useState(item?.skipKitchen ?? false);
   const [cat, setCat] = useState(categoryId);
   const [description, setDescription] = useState(item?.description ?? "");
   const [soldOut, setSoldOut] = useState(item ? !item.available : false);
@@ -346,6 +357,8 @@ function ItemEditor({
       categoryId: cat,
       description,
       available: !soldOut,
+      openPrice,
+      skipKitchen,
       groups: cleaned.map((x) => ({
         name: x.name,
         required: x.required,
@@ -411,7 +424,7 @@ function ItemEditor({
             <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder={t("e.g. Nasi Ayam Penyet")} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t("Price (RM)")}>
+            <Field label={openPrice ? t("Usual price (RM, optional)") : t("Price (RM)")}>
               <Input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="8.50" className="num" />
             </Field>
             <Field label={t("Category")}>
@@ -427,6 +440,24 @@ function ItemEditor({
           <Field label={t("Description")} hint={t("Shown under the name on the customer menu")}>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={255} placeholder={t("What's in it, how spicy, portion size")} />
           </Field>
+          <label className="flex items-start gap-2 text-sm font-medium">
+            <input type="checkbox" checked={openPrice} onChange={(e) => setOpenPrice(e.target.checked)} className="mt-0.5 size-4 accent-pandan" />
+            <span>
+              {t("Price keyed in at the counter")}
+              <span className="block text-xs font-normal text-mute">
+                {t("For nasi campur or lauk by the portion: the cashier types the amount for each order. Not shown on the QR menu.")}
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm font-medium">
+            <input type="checkbox" checked={skipKitchen} onChange={(e) => setSkipKitchen(e.target.checked)} className="mt-0.5 size-4 accent-pandan" />
+            <span>
+              {t("Don't send to kitchen")}
+              <span className="block text-xs font-normal text-mute">
+                {t("Handed over at the counter (nasi campur, canned drinks). Counter orders skip the kitchen board; QR orders still show it there.")}
+              </span>
+            </span>
+          </label>
           <label className="flex items-center gap-2 text-sm font-medium">
             <input type="checkbox" checked={soldOut} onChange={(e) => setSoldOut(e.target.checked)} className="size-4 accent-pandan" />
             {t("Sold out for now")}

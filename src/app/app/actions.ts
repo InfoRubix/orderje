@@ -25,6 +25,7 @@ import {
   createOrder,
   getOrderRow,
   OrderError,
+  MAX_OPEN_PRICE,
   outstandingCredit,
   payAtCounter,
   setOrderCustomer,
@@ -117,18 +118,51 @@ const counterOrderSchema = z.object({
         qty: z.number().int().min(1).max(99),
         optionIds: z.array(z.string().max(36)).max(20),
         note: z.string().max(160).optional(),
+        /** Sen, for open-price items such as nasi campur. */
+        price: z.number().int().min(1).max(MAX_OPEN_PRICE).optional(),
       }),
     )
     .min(1, "Add at least one item.")
     .max(100),
+  /** Made on the device so a retry never doubles the order. */
+  clientId: z.uuid().optional(),
+  /** ISO time the order was taken offline, for orders sent from the device's queue. */
+  queuedAt: z.iso.datetime({ offset: true }).optional(),
+  /** Pay now: create the order and take the payment in one go (walk-in pricing). */
+  pay: z
+    .object({
+      method: z.enum(["cash", "duitnow_qr"]),
+      /** Cash received in sen; missing = exact amount. */
+      tendered: z.number().int().min(0).max(10_000_000).optional(),
+      reference: z.string().max(120).optional(),
+    })
+    .optional(),
 });
 
-export async function createCounterOrder(input: z.infer<typeof counterOrderSchema>): Promise<ActionResult> {
-  const { tenant } = await requireUser(["owner", "cashier"]);
+export type CounterOrderInput = z.input<typeof counterOrderSchema>;
+
+export type CounterOrderResult =
+  | {
+      ok?: boolean;
+      error?: string;
+      id?: string;
+      orderNo?: number;
+      publicToken?: string;
+      /** Pay now only: change to hand back, in sen (null for DuitNow QR). */
+      change?: number | null;
+      /** Pay now only: the order was saved but the payment wasn't, so it's waiting as an unpaid bill. */
+      payError?: string;
+    }
+  | undefined;
+
+export async function createCounterOrder(input: CounterOrderInput): Promise<CounterOrderResult> {
+  const { user, tenant } = await requireUser(["owner", "cashier"]);
   const t = makeT(tenant.language);
   try {
     const d = counterOrderSchema.parse(input);
     if (d.orderType === "dine_in" && !d.tableId) return { error: t("Pick a table for dine-in, or switch to takeaway.") };
+    // Check before making the order, so a closed day doesn't leave an unpaid bill behind.
+    if (d.pay) await assertOpenToday(tenant.id);
     const o = await createOrder({
       tenantId: tenant.id,
       source: "counter",
@@ -138,9 +172,31 @@ export async function createCounterOrder(input: z.infer<typeof counterOrderSchem
       customerPhone: d.customerPhone,
       note: d.note,
       lines: d.lines,
+      clientId: d.clientId,
+      // A device clock in the future would confuse the kitchen timer, so cap it at now.
+      queuedAt: d.queuedAt ? new Date(Math.min(Date.parse(d.queuedAt), Date.now())) : null,
     });
     revalidatePath("/app/pos");
-    return { ok: true, id: o.id };
+    const row = await getOrderRow(tenant.id, o.id);
+    const done = { ok: true, id: o.id, orderNo: row?.orderNo, publicToken: o.publicToken };
+    if (!d.pay) return done;
+    // A retry of an order that was already paid (the reply got lost): nothing more to do.
+    if (row && (row.paymentStatus === "paid" || row.paymentStatus === "credit")) return { ...done, change: null };
+    try {
+      const r = await payAtCounter({
+        tenant,
+        orderId: o.id,
+        method: d.pay.method,
+        tenderedSen: d.pay.method === "cash" ? d.pay.tendered : undefined,
+        reference: d.pay.reference ?? null,
+        userId: user.id,
+      });
+      return { ...done, change: r.changeGiven };
+    } catch (e) {
+      // The order is in, the payment isn't: leave it as an unpaid bill and say why.
+      const msg = fail(e, tenant.language)?.error ?? t("Something went wrong and nothing was saved. Please try again.");
+      return { ...done, payError: msg };
+    }
   } catch (e) {
     return fail(e, tenant.language);
   }
@@ -265,6 +321,10 @@ const itemSchema = z.object({
   categoryId: z.string().min(1, "Pick a category.").max(36),
   description: z.string().max(255).optional(),
   available: z.boolean(),
+  /** Price typed at the counter for each order; `price` is then an optional usual price. */
+  openPrice: z.boolean().optional(),
+  /** Handed over at the counter: counter orders don't send it to the kitchen board. */
+  skipKitchen: z.boolean().optional(),
   groups: z
     .array(
       z.object({
@@ -290,8 +350,9 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
   const t = makeT(tenant.language);
   try {
     const d = itemSchema.parse(JSON.parse(String(f.get("data") ?? "{}")));
-    const price = toSen(d.price);
-    if (!Number.isFinite(price) || price <= 0) return { error: t("Enter a price, e.g. 8.50.") };
+    const openPrice = d.openPrice ?? false;
+    const price = openPrice && !d.price.trim() ? 0 : toSen(d.price);
+    if (!Number.isFinite(price) || price < 0 || (!openPrice && price === 0)) return { error: t("Enter a price, e.g. 8.50.") };
     if (!(await col.of(tenant.id, "categories").doc(d.categoryId).get()).exists) return { error: t("Pick a category.") };
     const items = col.of(tenant.id, "menuItems");
     const id = d.id || uid();
@@ -328,6 +389,8 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
       categoryId: d.categoryId,
       description: d.description?.trim() || null,
       available: d.available,
+      openPrice,
+      skipKitchen: d.skipKitchen ?? false,
       groups,
       ...image,
     };

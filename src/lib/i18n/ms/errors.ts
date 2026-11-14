@@ -10,6 +10,8 @@ const dict: Record<string, string> = {
   "Too many items in one order.": "Terlalu banyak item dalam satu pesanan.",
   "An item in your cart is no longer on the menu.": "Ada item dalam troli anda yang sudah tiada dalam menu.",
   "{name} is sold out.": "{name} sudah habis.",
+  "{name} is priced at the counter. Please order it there.": "Harga {name} ditentukan di kaunter. Sila pesan di kaunter.",
+  "Enter the price for {name}.": "Masukkan harga untuk {name}.",
   "Quantity must be between 1 and 99.": "Kuantiti mesti antara 1 hingga 99.",
   "An add-on for {name} is no longer available.": "Satu tambahan untuk {name} sudah tiada.",
   "Choose {group} for {name}.": "Pilih {group} untuk {name}.",

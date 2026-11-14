@@ -86,6 +86,14 @@ const dict: Record<string, string> = {
   "Enter your name": "Masukkan nama anda",
   "Enter a valid email": "Masukkan emel yang sah",
   "Password needs at least 8 characters": "Kata laluan perlu sekurang-kurangnya 8 aksara",
+
+  // ready alert on the order page
+  "Alert me when it's ready": "Beritahu saya bila siap",
+  "We'll beep when your food is ready. Keep this page open.": "Telefon akan berbunyi bila makanan siap. Biarkan page ini terbuka.",
+  "Order #{n} is ready!": "Pesanan #{n} sudah siap!",
+  "Order #{n} is ready! Please collect it at the counter.": "Pesanan #{n} sudah siap! Sila ambil di kaunter.",
+  "🔔 Order #{n} is ready": "🔔 Pesanan #{n} siap",
+  "WhatsApp Rubix support": "WhatsApp sokongan Rubix",
 };
 
 export default dict;
