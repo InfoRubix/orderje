@@ -43,7 +43,7 @@ export async function loadMenu(tenantId: string, opts: { includeUnavailable?: bo
         .filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available))
         // Customers can't set their own price, so open-price items stay at the counter.
         .filter((i) => !(opts.forCustomers && i.openPrice))
-        .map((i) => ({ ...i, openPrice: i.openPrice ?? false })),
+        .map((i) => ({ ...i, openPrice: i.openPrice ?? false, skipKitchen: i.skipKitchen ?? false })),
     }))
     .filter((c) => opts.includeUnavailable || c.items.length > 0);
 }
@@ -134,6 +134,7 @@ async function priceLines(
       unitPrice,
       qty,
       lineTotal: unitPrice * qty,
+      kitchen: !(opts.source === "counter" && item.skipKitchen),
     };
   });
 }
@@ -194,7 +195,8 @@ export async function createOrder(input: CreateOrderInput) {
       customerId: customer?.id ?? null,
       customerName: input.customerName?.trim().slice(0, 120) || customer?.name || null,
       customerPhone: input.customerPhone?.trim().slice(0, 32) || customer?.phone || null,
-      status: "new",
+      // Nothing for the kitchen to make (e.g. only nasi campur): it was handed over already.
+      status: items.some((i) => i.kitchen) ? "new" : "served",
       paymentStatus: "unpaid",
       ...totals,
       rounding: 0,

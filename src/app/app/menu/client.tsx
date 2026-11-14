@@ -29,6 +29,7 @@ export type EditorItem = {
   imageUrl: string | null;
   available: boolean;
   openPrice: boolean;
+  skipKitchen: boolean;
   categoryId: string;
   groups: Group[];
 };
@@ -236,6 +237,7 @@ function CategoryCard({
                 )}
                 {i.description ? ` · ${i.description}` : ""}
               </p>
+              {i.skipKitchen ? <p className="text-xs font-semibold text-ink-soft">{t("Not sent to kitchen")}</p> : null}
               {i.groups.length ? (
                 <p className="truncate text-xs text-mute">{i.groups.map((g) => g.name + (g.required ? ` (${t("required")})` : "")).join(", ")}</p>
               ) : null}
@@ -297,6 +299,7 @@ function ItemEditor({
   const [name, setName] = useState(item?.name ?? "");
   const [price, setPrice] = useState(item && item.price ? (item.price / 100).toFixed(2) : "");
   const [openPrice, setOpenPrice] = useState(item?.openPrice ?? false);
+  const [skipKitchen, setSkipKitchen] = useState(item?.skipKitchen ?? false);
   const [cat, setCat] = useState(categoryId);
   const [description, setDescription] = useState(item?.description ?? "");
   const [soldOut, setSoldOut] = useState(item ? !item.available : false);
@@ -355,6 +358,7 @@ function ItemEditor({
       description,
       available: !soldOut,
       openPrice,
+      skipKitchen,
       groups: cleaned.map((x) => ({
         name: x.name,
         required: x.required,
@@ -442,6 +446,15 @@ function ItemEditor({
               {t("Price keyed in at the counter")}
               <span className="block text-xs font-normal text-mute">
                 {t("For nasi campur or lauk by the portion: the cashier types the amount for each order. Not shown on the QR menu.")}
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm font-medium">
+            <input type="checkbox" checked={skipKitchen} onChange={(e) => setSkipKitchen(e.target.checked)} className="mt-0.5 size-4 accent-pandan" />
+            <span>
+              {t("Don't send to kitchen")}
+              <span className="block text-xs font-normal text-mute">
+                {t("Handed over at the counter (nasi campur, canned drinks). Counter orders skip the kitchen board; QR orders still show it there.")}
               </span>
             </span>
           </label>

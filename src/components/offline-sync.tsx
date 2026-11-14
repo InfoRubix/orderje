@@ -19,6 +19,8 @@ export function OfflineSync({ tenantId }: { tenantId: string }) {
   const online = useOnline();
   const queue = useQueue(tenantId);
   const [sending, setSending] = useState(false);
+  /** Paid-offline orders that arrived but whose payment the server refused (e.g. day already closed). */
+  const [unpaid, setUnpaid] = useState<{ id: string; text: string }[]>([]);
   const busy = useRef(false);
 
   // Lets the counter screen open again with no internet (see public/sw.js).
@@ -46,6 +48,12 @@ export function OfflineSync({ tenantId }: { tenantId: string }) {
         else {
           removeQueued(o.clientId);
           sent++;
+          const payError = r?.payError;
+          const id = r?.id;
+          if (payError && id) {
+            const text = t("Order #{n} is in, but not paid: {reason}", { n: r?.orderNo ?? "?", reason: payError });
+            setUnpaid((u) => [...u, { id, text }]);
+          }
         }
       }
     } finally {
@@ -53,7 +61,7 @@ export function OfflineSync({ tenantId }: { tenantId: string }) {
       setSending(false);
       if (sent) router.refresh();
     }
-  }, [tenantId, router]);
+  }, [tenantId, router, t]);
 
   const waiting = queue.filter((o) => !o.error).length;
 
@@ -66,7 +74,7 @@ export function OfflineSync({ tenantId }: { tenantId: string }) {
   }, [online, waiting, flush]);
 
   const failed = queue.filter((o) => o.error);
-  if (online && !queue.length) return null;
+  if (online && !queue.length && !unpaid.length) return null;
 
   return (
     <div className="no-print mb-4 space-y-2" role="status" aria-live="polite">
@@ -95,6 +103,19 @@ export function OfflineSync({ tenantId }: { tenantId: string }) {
           ) : null}
         </div>
       ) : null}
+      {unpaid.map((u) => (
+        <div key={u.id} className="rounded-xl border-2 border-chili bg-surface px-4 py-3 text-sm">
+          <p className="font-semibold text-chili">{u.text}</p>
+          <div className="mt-1 flex gap-3 font-bold">
+            <a href={`/app/orders/${u.id}`} className="underline">
+              {t("Open the bill")}
+            </a>
+            <button className="text-ink-soft" onClick={() => setUnpaid((x) => x.filter((y) => y.id !== u.id))}>
+              {t("Close")}
+            </button>
+          </div>
+        </div>
+      ))}
       {failed.map((o) => (
         <div key={o.clientId} className="rounded-xl border-2 border-chili bg-surface px-4 py-3 text-sm">
           <p className="font-semibold">

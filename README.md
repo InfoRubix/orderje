@@ -18,6 +18,8 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Customer type at payment: **Walk-in, Member, Staff, Corporate**. Member and staff discounts apply automatically; corporate bills go on the company's credit account with a limit, settled later.
 - Payment methods: **Cash** (BNM 5-sen rounding, quick tender buttons, change shown), **DuitNow QR** (customer scans the kedai's QR at the counter; bank reference required) and **Corporate credit**.
 - Printable 80 mm thermal receipt.
+- **Pay now** at the counter: build the order, tap **Pay now**, take cash (quick tender buttons, change shown) or DuitNow QR (bank reference), and the order and payment are saved in one step. The change stays on screen and the cart is cleared for the next customer, with links to print the receipt or open the bill. Walk-in pricing only; member, staff and corporate bills go through **Send to kitchen & bill**. Retries are safe: a payment can't be taken twice even if the reply is lost. With no internet, Pay now takes cash and is recorded when the order is sent. A closed day refuses Pay now before any order is made.
+- **Don't send to kitchen** per item, for things handed over at the counter (nasi campur, canned drinks). Counter orders leave those lines off the kitchen board, and an order with nothing for the kitchen is marked served straight away. QR orders still show them in the kitchen, since someone has to see them.
 - **Open-price items** for nasi campur or lauk by the portion: tick "Price keyed in at the counter" on the item. At the counter, tapping it asks for the amount (quick buttons for common prices, Enter to add) and an optional note for what's on the plate. Each plate at a different price is its own line. These items are hidden from the QR menu, and the server refuses them on a QR order, so customers can't set their own price. The sample menu includes one (Nasi Campur).
 - **Works with no internet.** If the kedai's internet drops, the counter keeps taking orders: they're saved on the device (a banner says how many are waiting) and sent automatically when it's back. Each order carries an id made on the device, so a retry never makes it twice, even when the first try reached the server but the reply was lost. An item marked sold out in the meantime doesn't block an order that was already served. The kitchen sees late arrivals marked **Offline** with the time they were taken, so nothing gets cooked twice. A service worker (`public/sw.js`) keeps the last copy of the New order screen, so it opens even after a refresh with no internet. Only counter orders work offline: QR ordering, payments and the kitchen board need the internet.
 
@@ -113,6 +115,7 @@ python3 tests/e2e.py                    # WIPES the emulator first; refuses to t
 python3 tests/features.py               # every feature's rules and error cases, prints PASS/FAIL per feature
 python3 tests/offline.py                # counter orders with no internet: save, refresh, send, no duplicates
 python3 tests/open_price.py             # nasi campur: price typed at the counter, hidden from QR, works offline
+python3 tests/quick_pay.py              # pay now at the counter, skip-kitchen items, no double payment
 ```
 
 ## Data changes

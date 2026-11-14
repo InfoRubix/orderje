@@ -93,6 +93,10 @@ const dict: Record<string, string> = {
     "Untuk nasi campur atau lauk ikut bahagian: juruwang taip harga untuk setiap pesanan. Tidak dipaparkan di menu QR.",
   "Price at counter": "Harga di kaunter",
   "Price at counter (usually {price})": "Harga di kaunter (biasanya {price})",
+  "Don't send to kitchen": "Jangan hantar ke dapur",
+  "Handed over at the counter (nasi campur, canned drinks). Counter orders skip the kitchen board; QR orders still show it there.":
+    "Diserahkan di kaunter (nasi campur, minuman tin). Pesanan kaunter tak masuk papan dapur; pesanan QR masih dipaparkan di sana.",
+  "Not sent to kitchen": "Tak dihantar ke dapur",
   "Add-ons & choices": "Tambahan & pilihan",
   "Group, e.g. Panas / Ais": "Kumpulan, cth. Panas / Ais",
   "Group name": "Nama kumpulan",

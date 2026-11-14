@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CloudOff, Minus, Plus, Trash2, X } from "lucide-react";
 import type { Menu, MenuItemFull } from "@/lib/orders";
 import { computeTotals, ORDER_TYPE_LABEL } from "@/lib/pricing";
-import { rm, toSen } from "@/lib/money";
+import { cashRound, rm, toSen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button, FormError, Input, Select } from "@/components/ui";
 import { useT } from "@/components/i18n";
@@ -15,6 +16,9 @@ import { createCounterOrder } from "../../actions";
 /** price: sen typed by the cashier, only for open-price items (nasi campur). */
 type Line = { key: string; item: MenuItemFull; qty: number; optionIds: string[]; note: string; price?: number };
 type OrderType = "dine_in" | "takeaway" | "delivery";
+type Pay = { method: "cash" | "duitnow_qr"; tendered?: number; reference?: string };
+/** What the last pay-now left on screen, so the cashier can read out the change and move on. */
+type Done = { orderNo?: number; id?: string; publicToken?: string; change: number | null; payError?: string; offline?: boolean };
 
 const MAX_OPEN_PRICE = 100_000; // keep in step with src/lib/orders.ts
 /** Amounts a kedai keys in most often for nasi campur; the item's usual price is added in front. */
@@ -50,6 +54,11 @@ export function CounterOrder({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<string>();
+  const [paying, setPaying] = useState(false);
+  const [method, setMethod] = useState<Pay["method"]>("cash");
+  const [tendered, setTendered] = useState("");
+  const [reference, setReference] = useState("");
+  const [done, setDone] = useState<Done>();
   const [busy, start] = useTransition();
   const online = useOnline();
   // One id per cart, kept through retries, so the same order can never be made twice.
@@ -60,6 +69,9 @@ export function CounterOrder({
   const items = menu.find((c) => c.id === cat)?.items ?? [];
 
   function add(item: MenuItemFull, optionIds: string[] = [], qty = 1, lineNote = "", price?: number) {
+    // Next customer: clear the last one's change and notes.
+    setDone(undefined);
+    setSaved(undefined);
     setLines((cur) => {
       const same = cur.find(
         (l) => l.item.id === item.id && l.optionIds.join() === optionIds.join() && l.note === lineNote && l.price === price,
@@ -77,9 +89,18 @@ export function CounterOrder({
     setCartId(crypto.randomUUID());
   }
 
-  function submit() {
+  const cashDue = cashRound(totals.total);
+  const tSen = tendered ? toSen(tendered) : cashDue;
+  const quickCash = [...new Set([cashDue, ...[1000, 2000, 5000, 10000].map((n) => Math.ceil(cashDue / n) * n)])]
+    .filter((v) => v >= cashDue)
+    .slice(0, 4);
+  const payBlocked =
+    method === "cash" ? !Number.isFinite(tSen) || tSen < cashDue : !online || !reference.trim();
+
+  function submit(pay?: Pay) {
     setError(undefined);
     setSaved(undefined);
+    setDone(undefined);
     if (orderType === "dine_in" && !tableId) return setError(t("Pick a table for dine-in, or switch to takeaway."));
     const input = {
       orderType,
@@ -94,13 +115,24 @@ export function CounterOrder({
         note: l.note || undefined,
         price: l.item.openPrice ? l.price : undefined,
       })),
+      pay,
+    };
+    const change = pay?.method === "cash" ? (pay.tendered ?? cashDue) - cashDue : null;
+    const finishPay = (d: Done) => {
+      clearCart();
+      setPaying(false);
+      setTendered("");
+      setReference("");
+      setDone(d);
     };
 
     const saveOnDevice = () => {
+      if (pay && pay.method !== "cash") return setError(t("DuitNow QR needs internet. Take cash, or bill it later."));
       const label =
         (orderType === "dine_in" ? tables.find((tb) => tb.id === tableId)?.label : undefined) ?? (name || t(ORDER_TYPE_LABEL[orderType]));
       const ok = enqueue({ clientId: cartId, tenantId, queuedAt: new Date().toISOString(), input, label, total: totals.total });
       if (!ok) return setError(t("No internet, and this browser won't save the order. Write it down for now."));
+      if (pay) return finishPay({ change, offline: true });
       clearCart();
       setSaved(t("Saved on this device: {label}, {total}. Tell the kitchen now; it's sent to the system when the internet is back.", { label, total: rm(totals.total) }));
     };
@@ -116,6 +148,7 @@ export function CounterOrder({
         return saveOnDevice();
       }
       if (r?.error) setError(r.error);
+      else if (pay) finishPay({ orderNo: r?.orderNo, id: r?.id, publicToken: r?.publicToken, change: r?.change ?? null, payError: r?.payError });
       else if (r?.id) router.push(`/app/orders/${r.id}`);
     });
   }
@@ -254,20 +287,118 @@ export function CounterOrder({
               <dd>{rm(totals.total)}</dd>
             </div>
           </dl>
-          <p className="text-xs text-mute">{t("Member, staff or corporate pricing is applied on the payment screen.")}</p>
+          <p className="text-xs text-mute">
+            {t("Pay now is walk-in pricing. For member, staff or corporate, use Send to kitchen & bill.")}
+          </p>
           <FormError message={error} />
+          {done ? <DoneNote done={done} /> : null}
           {saved ? (
             <p role="status" className="rounded-md border-2 border-teh bg-teh-soft px-3 py-2 text-sm font-semibold text-teh">
               {saved}
             </p>
           ) : null}
-          <Button size="xl" className="w-full" disabled={busy || lines.length === 0} onClick={submit}>
-            {busy ? t("Sending…") : online ? t("Send to kitchen & bill") : (
-              <>
-                <CloudOff className="size-4" aria-hidden /> {t("Save order on this device")}
-              </>
-            )}
-          </Button>
+          {paying ? (
+            <div className="space-y-3 rounded-lg border-2 border-edge p-3">
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-paper p-1">
+                {(
+                  [
+                    ["cash", "Cash"],
+                    ["duitnow_qr", "DuitNow QR"],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    disabled={m === "duitnow_qr" && !online}
+                    onClick={() => setMethod(m)}
+                    aria-pressed={method === m}
+                    className={cn(
+                      "rounded-md py-2 text-sm font-semibold disabled:opacity-40",
+                      method === m ? "bg-surface text-ink shadow-sm" : "text-ink-soft",
+                    )}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+              {method === "cash" ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-ink-soft">
+                    {t("Cash due")} <span className="num font-bold text-ink">{rm(cashDue)}</span>
+                    {cashDue !== totals.total ? ` ${t("(rounded to 5 sen)")}` : ""}
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {quickCash.map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setTendered((v / 100).toFixed(2))}
+                        className="num rounded-md border-2 border-edge py-2 text-sm font-semibold hover:bg-tag-soft"
+                      >
+                        {v === cashDue ? t("Exact") : (v / 100).toFixed(0)}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    inputMode="decimal"
+                    value={tendered}
+                    onChange={(e) => setTendered(e.target.value)}
+                    placeholder={t("Cash received, e.g. 50")}
+                    aria-label={t("Cash received")}
+                    className="num h-12 text-lg"
+                  />
+                  {Number.isFinite(tSen) && tSen >= cashDue ? (
+                    <p className="num text-right text-lg font-bold">{t("Change {amount}", { amount: rm(tSen - cashDue) })}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-ink-soft">
+                    {t("Customer scans your DuitNow QR at the counter. Check your bank app, then enter the reference.")}
+                  </p>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t("Bank reference (last 4–6 digits)")} />
+                </div>
+              )}
+              <Button
+                size="xl"
+                className="w-full"
+                disabled={busy || lines.length === 0 || payBlocked}
+                onClick={() =>
+                  submit(
+                    method === "cash"
+                      ? { method, tendered: tendered ? tSen : undefined }
+                      : { method, reference: reference.trim() },
+                  )
+                }
+              >
+                {busy ? t("Saving…") : t("Receive {amount}", { amount: rm(method === "cash" ? cashDue : totals.total) })}
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setPaying(false)}>
+                {t("Back")}
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <Button
+                size="xl"
+                className="w-full"
+                disabled={busy || lines.length === 0}
+                onClick={() => {
+                  setError(undefined);
+                  setDone(undefined);
+                  if (!online) setMethod("cash");
+                  setPaying(true);
+                }}
+              >
+                {t("Pay now · {amount}", { amount: rm(cashDue) })}
+              </Button>
+              <Button size="lg" variant="secondary" className="w-full" disabled={busy || lines.length === 0} onClick={() => submit()}>
+                {busy ? t("Sending…") : online ? t("Send to kitchen & bill") : (
+                  <>
+                    <CloudOff className="size-4" aria-hidden /> {t("Save order on this device")}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -281,6 +412,48 @@ export function CounterOrder({
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+function DoneNote({ done }: { done: Done }) {
+  const t = useT();
+  if (done.payError)
+    return (
+      <div role="status" className="rounded-md border-2 border-chili bg-chili-soft px-3 py-2 text-sm text-chili">
+        <p className="font-semibold">
+          {t("Order #{n} is in, but not paid: {reason}", { n: done.orderNo ?? "?", reason: done.payError })}
+        </p>
+        {done.id ? (
+          <Link href={`/app/orders/${done.id}`} className="font-bold underline">
+            {t("Open the bill")}
+          </Link>
+        ) : null}
+      </div>
+    );
+  if (done.offline)
+    return (
+      <p role="status" className="rounded-md border-2 border-teh bg-teh-soft px-3 py-2 text-sm font-semibold text-teh">
+        {done.change ? `${t("Change {amount}", { amount: rm(done.change) })}. ` : ""}
+        {t("Paid in cash and saved on this device. Tell the kitchen now; it's sent to the system when the internet is back.")}
+      </p>
+    );
+  return (
+    <div role="status" className="rounded-md border-2 border-pandan bg-pandan-soft px-3 py-2 text-pandan-dark">
+      <p className="text-sm font-semibold">{t("Paid · Order #{n}", { n: done.orderNo ?? "?" })}</p>
+      {done.change !== null ? <p className="num font-display text-2xl font-bold">{t("Change {amount}", { amount: rm(done.change) })}</p> : null}
+      <div className="mt-1 flex gap-3 text-sm font-bold">
+        {done.publicToken ? (
+          <a href={`/r/${done.publicToken}?print=1`} target="_blank" rel="noreferrer" className="underline">
+            {t("Print receipt")}
+          </a>
+        ) : null}
+        {done.id ? (
+          <Link href={`/app/orders/${done.id}`} className="underline">
+            {t("Open the bill")}
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

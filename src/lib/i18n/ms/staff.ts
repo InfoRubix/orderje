@@ -106,11 +106,18 @@ const dict: Record<string, string> = {
   "Phone (optional)": "Telefon (pilihan)",
   "Tap items to add them.": "Tekan item untuk tambah.",
   "Order note": "Nota pesanan",
-  "Member, staff or corporate pricing is applied on the payment screen.":
-    "Harga ahli, staf atau korporat dikira di skrin bayaran.",
   "Sending…": "Menghantar…",
   "Send to kitchen & bill": "Hantar ke dapur & bil",
   "Key in price": "Taip harga",
+  "Pay now · {amount}": "Bayar sekarang · {amount}",
+  "Pay now is walk-in pricing. For member, staff or corporate, use Send to kitchen & bill.":
+    "Bayar sekarang guna harga pelanggan biasa. Untuk ahli, staf atau korporat, guna Hantar ke dapur & bil.",
+  "DuitNow QR needs internet. Take cash, or bill it later.": "DuitNow QR perlukan internet. Terima tunai, atau bil kemudian.",
+  "Order #{n} is in, but not paid: {reason}": "Pesanan #{n} sudah masuk, tapi belum dibayar: {reason}",
+  "Open the bill": "Buka bil",
+  "Paid in cash and saved on this device. Tell the kitchen now; it's sent to the system when the internet is back.":
+    "Dibayar tunai dan disimpan dalam peranti ini. Beritahu dapur sekarang; ia dihantar ke sistem bila internet pulih.",
+  "Paid · Order #{n}": "Dibayar · Pesanan #{n}",
   "Enter the price": "Masukkan harga",
   "What's on the plate (optional)": "Lauk apa dalam pinggan (pilihan)",
 

@@ -102,6 +102,11 @@ export type MenuItem = {
    * these items are hidden from the QR menu. Missing on older items = false.
    */
   openPrice?: boolean;
+  /**
+   * Handed over at the counter (nasi campur, canned drinks), so counter orders don't put it on
+   * the kitchen board. QR orders still show it there, since someone has to see them. Missing = false.
+   */
+  skipKitchen?: boolean;
   imageUrl: string | null;
   imagePath: string | null;
   available: boolean;
@@ -140,6 +145,8 @@ export type OrderItem = {
   unitPrice: number;
   qty: number;
   lineTotal: number;
+  /** false when this line skips the kitchen board (see MenuItem.skipKitchen). Missing = true. */
+  kitchen?: boolean;
 };
 
 export type Order = {
