@@ -9,9 +9,13 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Picks add-ons (ais, kurang manis, telur mata), chooses makan sini or bungkus, and sends the order.
 - Watches the order move through Received → Cooking → Ready → Served on a live page, which tells them to **pay at the counter**.
 - Gets a receipt link they can save or share by WhatsApp.
+- **Ready alert**: tap "Alert me when it's ready" once and the phone beeps, vibrates and shows a big banner when the kitchen marks the order ready (the tab title changes too). The screen is kept awake so the page keeps checking. It only works while the order page is open, so customers with no phone or no data use the calling screen.
 
 **Kitchen**
 - Live ticket board (New / Cooking / Ready) with Undo and Cancel, polling every 4 s, with optional sound for new orders and full-screen mode for a wall tablet.
+
+**Calling screen** at `/app/display`, for a TV or tablet facing the customers
+- Big order numbers in "Being made" and "Ready to collect", with the table or the takeaway name. A new ready number pulses and chimes (after "Turn on sound"). Served orders drop off. Full-screen mode.
 
 **Counter (cashier)**
 - Unpaid bills by table, a "just paid" list with the payment method and receipt, and a quick order builder for walk-ins, takeaway and delivery (Grab/Foodpanda).
@@ -40,7 +44,11 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Nothing is saved until the owner reviews the draft: edit names, prices and categories, drag the crop box on each photo, drop changes, then **Masukkan ke menu**. Photos are cropped on the server.
 - Each kedai gets `AI_DAILY_LIMIT` requests a day (default 30). `OPENAI_API_KEY=mock` returns canned answers for local testing; leave it empty to hide the page.
 
-**Rubix (super admin)** at `/admin`: every kedai, 30-day order count, suspend / reactivate.
+**Plan & support**
+- **Plan** page (owner): the free plan, with no time limit, and the paid add-ons (supplier invoices, petty cash), listed as coming soon with a WhatsApp button to register interest. No prices are shown; they're agreed on WhatsApp. The list lives in `src/lib/plans.ts`.
+- **Help on WhatsApp** in the staff app (sidebar, or the header on phones) opens a chat with Rubix with the kedai's name and slug already typed. The suspended-account login page and the landing page have it too. The number is `SUPPORT_WHATSAPP` (defaults to 011-5551 5937).
+
+**Rubix (super admin)** at `/admin`: every kedai, 30-day order count, suspend / reactivate, and switch add-ons on or off per kedai.
 
 ## Clickable demo
 
@@ -73,6 +81,7 @@ Sign up at `/signup` (tick "Start with a sample mamak menu" for demo data). The 
 | `APP_URL` | Public URL used in table QR codes, so set it before printing QRs |
 | `SUPERADMIN_EMAILS` | Comma-separated Rubix emails allowed into `/admin` |
 | `ALLOW_SIGNUP` | `false` to close public signup and onboard kedai manually |
+| `SUPPORT_WHATSAPP` | Rubix's WhatsApp for help and add-on requests, e.g. `011-5551 5937` (the default) |
 | `FIRESTORE_EMULATOR_HOST` | Local only: `127.0.0.1:8080` to use the emulator |
 | `FIREBASE_PROJECT_ID` | Firebase project ID (`demo-orderje` for the emulator) |
 | `FIREBASE_SERVICE_ACCOUNT` | Service-account JSON (raw or base64) for the real project. Required on Vercel |
@@ -116,6 +125,7 @@ python3 tests/features.py               # every feature's rules and error cases,
 python3 tests/offline.py                # counter orders with no internet: save, refresh, send, no duplicates
 python3 tests/open_price.py             # nasi campur: price typed at the counter, hidden from QR, works offline
 python3 tests/quick_pay.py              # pay now at the counter, skip-kitchen items, no double payment
+python3 tests/ready_support_plan.py     # ready alert, calling screen, WhatsApp links, plan page, admin add-ons
 ```
 
 ## Data changes

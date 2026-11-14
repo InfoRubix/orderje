@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { makeT } from "@/lib/i18n";
 import { requestLang } from "@/lib/i18n/server";
+import { whatsappLink } from "@/lib/support";
 import { LoginForm } from "./form";
 
 export async function generateMetadata() {
@@ -20,6 +21,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <h1 className="font-display text-3xl font-bold">{t("Log in")}</h1>
       <p className="mt-1 text-sm text-ink-soft">{t("Owner, cashier or kitchen staff.")}</p>
       <LoginForm notice={e && ERR[e] ? t(ERR[e]) : undefined} />
+      {e === "suspended" ? (
+        <a
+          href={whatsappLink("Hi Rubix, akaun OrderTerus kedai saya digantung. Boleh bantu? Nama kedai: ")}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-block text-sm font-bold text-ink underline decoration-tag decoration-[3px] underline-offset-4"
+        >
+          {t("WhatsApp Rubix support")}
+        </a>
+      ) : null}
       {process.env.ALLOW_SIGNUP !== "false" ? (
         <p className="mt-6 text-sm text-ink-soft">
           {t("New kedai?")}{" "}

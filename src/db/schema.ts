@@ -25,6 +25,7 @@
  */
 
 import type { Lang } from "@/lib/i18n";
+import type { AddonKey } from "@/lib/plans";
 
 export type Role = "owner" | "cashier" | "kitchen";
 export type OrderType = "dine_in" | "takeaway" | "delivery";
@@ -60,6 +61,8 @@ export type Tenant = {
   receiptFooter: string | null;
   orderSeq: number;
   active: boolean;
+  /** Paid add-ons Rubix has switched on for this kedai (see src/lib/plans.ts). Missing = none. */
+  addons?: AddonKey[];
   createdAt: Date;
 };
 

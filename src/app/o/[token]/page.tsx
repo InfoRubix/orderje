@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { brandStyle } from "@/lib/brand";
 import { ShopLogo } from "@/components/thumb";
+import { ReadyAlert } from "@/components/ready-alert";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
@@ -84,6 +85,22 @@ export default async function OrderPage({ params }: { params: Promise<{ token: s
             })}
           </ol>
         )}
+
+        <ReadyAlert
+          token={order.publicToken}
+          status={order.status}
+          text={{
+            arm: t("Alert me when it's ready"),
+            armed: t("We'll beep when your food is ready. Keep this page open."),
+            // Dine-in may be brought to the table, so only takeaway is told to come to the counter.
+            ready:
+              order.orderType === "dine_in"
+                ? t("Order #{n} is ready!", { n: order.orderNo })
+                : t("Order #{n} is ready! Please collect it at the counter.", { n: order.orderNo }),
+            readyTitle: t("🔔 Order #{n} is ready", { n: order.orderNo }),
+            keepOpen: t("Keep this page open. It updates by itself."),
+          }}
+        />
 
         <section className="slip rounded-t-lg px-5 pb-6 pt-4">
           <ul className="divide-y divide-dashed divide-line">

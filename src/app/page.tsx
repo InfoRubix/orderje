@@ -2,6 +2,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { ArrowRight, BellRing, ChefHat, Receipt, ScanLine, Store, Utensils } from "lucide-react";
 import { appUrl, cn } from "@/lib/utils";
+import { whatsappLink } from "@/lib/support";
 import { buttonVariants } from "@/components/ui";
 import { BrandIcon, BrandMark, Logo } from "@/components/brand";
 import { Awning, KitchenTicket, MiniChart, MiniReceipt, PhoneMenu, TableTent } from "@/components/landing/graphics";
@@ -40,6 +41,22 @@ const LOCAL = [
 ] as const;
 
 const FAQ = [
+  [
+    "Berapa harga?",
+    "Percuma, tiada had masa. QR menu, skrin dapur, kaunter, bayaran dan rekon hujung hari semua percuma. Tambahan berbayar seperti invois pembekal dan petty cash kedai akan datang: WhatsApp kami untuk tahu lebih.",
+  ],
+  [
+    "Kalau internet kedai putus?",
+    "Kaunter masih boleh ambil order dan terima tunai. Order disimpan dalam telefon atau tablet, dan masuk sistem sendiri bila internet pulih.",
+  ],
+  [
+    "Kedai nasi campur boleh guna?",
+    "Boleh. Juruwang taip harga nasi campur ikut lauk yang customer ambil, terus bayar di kaunter. Nasi campur tak masuk skrin dapur, cuma air dan masakan panas.",
+  ],
+  [
+    "Customer tak ada data atau tak nak scan QR?",
+    "Juruwang boleh ambil order di kaunter macam kedai mamak. Letak tablet atau TV di kaunter dengan skrin panggilan: nombor order muncul bila makanan sedia diambil.",
+  ],
   ["Customer kena download app ke?", "Tidak. Customer scan QR dengan kamera telefon dan menu terus terbuka dalam browser."],
   [
     "Customer boleh bayar online dari telefon?",
@@ -325,6 +342,9 @@ export default async function Landing() {
             <span>oleh Rubix Technology (M) Sdn Bhd</span>
           </div>
           <div className="flex gap-5 font-semibold text-ink">
+            <a href={whatsappLink("Hi Rubix, saya nak tahu tentang OrderTerus untuk kedai saya.")} target="_blank" rel="noreferrer" className="hover:text-tag">
+              WhatsApp kami
+            </a>
             <Link href="/login" className="hover:text-tag">Log masuk</Link>
             {signupOpen ? (
               <Link href="/signup" className="hover:text-tag">Daftar kedai</Link>
