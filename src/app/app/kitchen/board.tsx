@@ -20,6 +20,8 @@ type Ticket = {
   note: string | null;
   paymentStatus: string;
   createdAt: number;
+  /** Taken at the counter with no internet; the kitchen may already have cooked it by word of mouth. */
+  queuedAt: number | null;
   items: { id: string; name: string; qty: number; modifiers: string | null; note: string | null }[];
 };
 
@@ -136,7 +138,7 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
                     <Empty title={col.status === "new" ? tr("No new orders") : tr("Nothing here")} />
                   ) : (
                     list.map((t) => {
-                      const mins = Math.max(0, Math.floor((now - t.createdAt) / 60000));
+                      const mins = Math.max(0, Math.floor((now - (t.queuedAt ?? t.createdAt)) / 60000));
                       return (
                         <article key={t.id} className={cn("rounded-xl border-2 border-edge bg-surface px-4 pb-4 pt-3", fresh.has(t.id) && "arrive")}>
                           <header className="flex items-start justify-between gap-2 border-b border-dashed border-line pb-2">
@@ -154,9 +156,17 @@ export function KitchenBoard({ canCancel }: { canCancel: boolean }) {
                               <div className="mt-1 flex justify-end gap-1">
                                 {t.orderType !== "dine_in" ? <Badge tone="amber">{tr(ORDER_TYPE_LABEL[t.orderType])}</Badge> : null}
                                 {t.source === "qr" ? <Badge>QR</Badge> : null}
+                                {t.queuedAt ? <Badge tone="red">{tr("Offline")}</Badge> : null}
                               </div>
                             </div>
                           </header>
+                          {t.queuedAt ? (
+                            <p className="mt-2 rounded bg-chili-soft px-2 py-1 text-sm font-semibold text-chili">
+                              {tr("Taken offline at {time}. Check it wasn't cooked already.", {
+                                time: new Date(t.queuedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                              })}
+                            </p>
+                          ) : null}
                           <ul className="space-y-1.5 py-3">
                             {t.items.map((i) => (
                               <li key={i.id} className="flex gap-2">

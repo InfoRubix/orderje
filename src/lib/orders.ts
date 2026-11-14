@@ -62,10 +62,17 @@ export type CreateOrderInput = {
   customerPhone?: string | null;
   note?: string | null;
   lines: OrderLineInput[];
+  /**
+   * Order id made on the device. Sending the same id twice returns the first order instead of
+   * making a second one, so an offline order can be retried until it gets through.
+   */
+  clientId?: string;
+  /** When the counter took the order offline; set only for orders sent from the device's queue. */
+  queuedAt?: Date | null;
 };
 
 /** Prices every line from the database, never from the client. */
-async function priceLines(tenantId: string, lines: OrderLineInput[]) {
+async function priceLines(tenantId: string, lines: OrderLineInput[], opts: { allowSoldOut?: boolean } = {}) {
   if (!lines.length) throw new OrderError("Add at least one item.");
   if (lines.length > 100) throw new OrderError("Too many items in one order.");
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))];
@@ -75,7 +82,8 @@ async function priceLines(tenantId: string, lines: OrderLineInput[]) {
   return lines.map((l) => {
     const item = items.find((i) => i.id === l.menuItemId);
     if (!item) throw new OrderError("An item in your cart is no longer on the menu.");
-    if (!item.available) throw new OrderError("{name} is sold out.", { name: item.name });
+    // An offline order was already served; marking the item sold out since then mustn't lose the sale.
+    if (!item.available && !opts.allowSoldOut) throw new OrderError("{name} is sold out.", { name: item.name });
     const qty = Math.trunc(l.qty);
     if (!(qty >= 1 && qty <= 99)) throw new OrderError("Quantity must be between 1 and 99.");
 
@@ -127,16 +135,27 @@ export async function createOrder(input: CreateOrderInput) {
 
   const customerType = input.customerType ?? "walk_in";
   const customer = await resolveCustomer(tenant.id, customerType, input.customerId);
-  const items = await priceLines(tenant.id, input.lines);
+  const orderId = input.clientId ?? uid();
+  const orderRef = col.of(tenant.id, "orders").doc(orderId);
+  // Fast path for a retry whose first attempt got through (the reply was lost on a bad connection).
+  const existing = read<Order>(await orderRef.get());
+  if (existing) return { id: existing.id, publicToken: existing.publicToken };
+
+  const items = await priceLines(tenant.id, input.lines, { allowSoldOut: Boolean(input.queuedAt) });
   const subtotal = items.reduce((s, l) => s + l.lineTotal, 0);
   const totals = computeTotals(tenant, subtotal, customerType, input.orderType);
 
-  const orderId = uid();
-  const publicToken = token(20);
+  let publicToken = token(20);
   const tenantRef = col.tenants().doc(tenant.id);
 
   await fs().runTransaction(async (tx) => {
-    const seq = Number((await tx.get(tenantRef)).get("orderSeq") ?? 0) + 1;
+    const [tenantSnap, orderSnap] = await Promise.all([tx.get(tenantRef), tx.get(orderRef)]);
+    if (orderSnap.exists) {
+      // Two retries of the same offline order raced each other; keep the first.
+      publicToken = String(orderSnap.get("publicToken"));
+      return;
+    }
+    const seq = Number(tenantSnap.get("orderSeq") ?? 0) + 1;
     tx.update(tenantRef, { orderSeq: seq });
     const order: Omit<Order, "id"> = {
       tenantId: tenant.id,
@@ -157,9 +176,10 @@ export async function createOrder(input: CreateOrderInput) {
       note: input.note?.trim().slice(0, 255) || null,
       items,
       createdAt: new Date(),
+      queuedAt: input.queuedAt ?? null,
       paidAt: null,
     };
-    tx.create(col.of(tenant.id, "orders").doc(orderId), order);
+    tx.create(orderRef, order);
     tx.create(col.orderTokens().doc(publicToken), { tenantId: tenant.id, orderId });
   });
 

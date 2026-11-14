@@ -162,6 +162,12 @@ export type Order = {
   note: string | null;
   items: OrderItem[];
   createdAt: Date;
+  /**
+   * Set when the counter took the order with no internet: the time on the device. createdAt is
+   * when it reached the server, so reports and recon still count it on the day it was sent.
+   * Missing on older orders.
+   */
+  queuedAt?: Date | null;
   paidAt: Date | null;
 };
 

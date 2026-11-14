@@ -18,6 +18,7 @@ QR ordering and POS for kedai makan, by Rubix Technology (M) Sdn Bhd. Multi-tena
 - Customer type at payment: **Walk-in, Member, Staff, Corporate**. Member and staff discounts apply automatically; corporate bills go on the company's credit account with a limit, settled later.
 - Payment methods: **Cash** (BNM 5-sen rounding, quick tender buttons, change shown), **DuitNow QR** (customer scans the kedai's QR at the counter; bank reference required) and **Corporate credit**.
 - Printable 80 mm thermal receipt.
+- **Works with no internet.** If the kedai's internet drops, the counter keeps taking orders: they're saved on the device (a banner says how many are waiting) and sent automatically when it's back. Each order carries an id made on the device, so a retry never makes it twice, even when the first try reached the server but the reply was lost. An item marked sold out in the meantime doesn't block an order that was already served. The kitchen sees late arrivals marked **Offline** with the time they were taken, so nothing gets cooked twice. A service worker (`public/sw.js`) keeps the last copy of the New order screen, so it opens even after a refresh with no internet. Only counter orders work offline: QR ordering, payments and the kitchen board need the internet.
 
 **Owner**
 - Dashboard: sales, average bill, money in hand vs credit, discounts, cancellations, sales by hour/day, by payment method, customer type, order type, QR vs counter, best sellers, SST and service charge collected.
@@ -109,6 +110,7 @@ npm run emulators                       # terminal 1
 npm run build && npm start              # terminal 2
 python3 tests/e2e.py                    # WIPES the emulator first; refuses to touch a real project
 python3 tests/features.py               # every feature's rules and error cases, prints PASS/FAIL per feature
+python3 tests/offline.py                # counter orders with no internet: save, refresh, send, no duplicates
 ```
 
 ## Data changes

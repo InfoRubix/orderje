@@ -110,6 +110,29 @@ const dict: Record<string, string> = {
     "Harga ahli, staf atau korporat dikira di skrin bayaran.",
   "Sending…": "Menghantar…",
   "Send to kitchen & bill": "Hantar ke dapur & bil",
+
+  // offline counter orders
+  "Save order on this device": "Simpan pesanan dalam peranti ini",
+  "No internet, and this browser won't save the order. Write it down for now.":
+    "Tiada internet, dan pelayar ini tak dapat simpan pesanan. Tulis dulu buat masa ini.",
+  "Saved on this device: {label}, {total}. Tell the kitchen now; it's sent to the system when the internet is back.":
+    "Disimpan dalam peranti ini: {label}, {total}. Beritahu dapur sekarang; ia dihantar ke sistem bila internet pulih.",
+  "No internet.": "Tiada internet.",
+  "You can still take counter orders. They're saved on this device and go to the kitchen when the internet is back.":
+    "Anda masih boleh ambil pesanan di kaunter. Ia disimpan dalam peranti ini dan dihantar ke dapur bila internet pulih.",
+  "Sending saved orders…": "Menghantar pesanan yang disimpan…",
+  "1 order saved on this device, waiting for internet.": "1 pesanan disimpan dalam peranti ini, menunggu internet.",
+  "{n} orders saved on this device, waiting for internet.": "{n} pesanan disimpan dalam peranti ini, menunggu internet.",
+  "Send now": "Hantar sekarang",
+  "Saved order not sent: {label}, {total}": "Pesanan tersimpan tak dapat dihantar: {label}, {total}",
+  "1 item, taken at {time}": "1 item, diambil pada {time}",
+  "{n} items, taken at {time}": "{n} item, diambil pada {time}",
+  "Try again": "Cuba lagi",
+  "Delete this saved order? It will not reach the kitchen or the reports.":
+    "Padam pesanan tersimpan ini? Ia tak akan sampai ke dapur atau laporan.",
+  Offline: "Luar talian",
+  "Taken offline at {time}. Check it wasn't cooked already.": "Diambil semasa tiada internet pada {time}. Semak jika sudah dimasak.",
+  "Taken offline at {time}, sent when the internet came back.": "Diambil semasa tiada internet pada {time}, dihantar bila internet pulih.",
   "(required)": "(wajib)",
   "(optional)": "(pilihan)",
   "Kitchen note": "Nota untuk dapur",

@@ -121,9 +121,15 @@ const counterOrderSchema = z.object({
     )
     .min(1, "Add at least one item.")
     .max(100),
+  /** Made on the device so a retry never doubles the order. */
+  clientId: z.uuid().optional(),
+  /** ISO time the order was taken offline, for orders sent from the device's queue. */
+  queuedAt: z.iso.datetime({ offset: true }).optional(),
 });
 
-export async function createCounterOrder(input: z.infer<typeof counterOrderSchema>): Promise<ActionResult> {
+export type CounterOrderInput = z.input<typeof counterOrderSchema>;
+
+export async function createCounterOrder(input: CounterOrderInput): Promise<ActionResult> {
   const { tenant } = await requireUser(["owner", "cashier"]);
   const t = makeT(tenant.language);
   try {
@@ -138,6 +144,9 @@ export async function createCounterOrder(input: z.infer<typeof counterOrderSchem
       customerPhone: d.customerPhone,
       note: d.note,
       lines: d.lines,
+      clientId: d.clientId,
+      // A device clock in the future would confuse the kitchen timer, so cap it at now.
+      queuedAt: d.queuedAt ? new Date(Math.min(Date.parse(d.queuedAt), Date.now())) : null,
     });
     revalidatePath("/app/pos");
     return { ok: true, id: o.id };

@@ -29,6 +29,7 @@ export async function GET() {
       note: o.note,
       paymentStatus: o.paymentStatus,
       createdAt: o.createdAt.getTime(),
+      queuedAt: o.queuedAt ? o.queuedAt.getTime() : null,
       items: (o.items ?? []).map((i) => ({ id: i.id, name: i.name, qty: i.qty, modifiers: i.modifiers, note: i.note })),
     })),
   });

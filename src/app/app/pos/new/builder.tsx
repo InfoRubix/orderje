@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, Trash2, X } from "lucide-react";
+import { CloudOff, Minus, Plus, Trash2, X } from "lucide-react";
 import type { Menu, MenuItemFull } from "@/lib/orders";
 import { computeTotals, ORDER_TYPE_LABEL } from "@/lib/pricing";
 import { rm } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button, FormError, Input, Select } from "@/components/ui";
 import { useT } from "@/components/i18n";
+import { enqueue, useOnline } from "@/lib/offline-queue";
 import { createCounterOrder } from "../../actions";
 
 type Line = { key: string; item: MenuItemFull; qty: number; optionIds: string[]; note: string };
@@ -20,11 +21,13 @@ const optNames = (item: MenuItemFull, ids: string[]) =>
   ids.map((id) => item.groups.flatMap((g) => g.options).find((o) => o.id === id)?.name).filter(Boolean).join(", ");
 
 export function CounterOrder({
+  tenantId,
   menu,
   tables,
   defaultTable,
   rates,
 }: {
+  tenantId: string;
   menu: Menu;
   tables: { id: string; label: string }[];
   defaultTable?: string;
@@ -41,7 +44,11 @@ export function CounterOrder({
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
+  const [saved, setSaved] = useState<string>();
   const [busy, start] = useTransition();
+  const online = useOnline();
+  // One id per cart, kept through retries, so the same order can never be made twice.
+  const [cartId, setCartId] = useState(() => crypto.randomUUID());
 
   const subtotal = lines.reduce((s, l) => s + unit(l.item, l.optionIds) * l.qty, 0);
   const totals = computeTotals(rates, subtotal, "walk_in", orderType);
@@ -55,17 +62,46 @@ export function CounterOrder({
     });
   }
 
+  function clearCart() {
+    setLines([]);
+    setName("");
+    setPhone("");
+    setNote("");
+    setCartId(crypto.randomUUID());
+  }
+
   function submit() {
+    setError(undefined);
+    setSaved(undefined);
+    if (orderType === "dine_in" && !tableId) return setError(t("Pick a table for dine-in, or switch to takeaway."));
+    const input = {
+      orderType,
+      tableId: orderType === "dine_in" ? tableId || null : null,
+      customerName: name || undefined,
+      customerPhone: phone || undefined,
+      note: note || undefined,
+      lines: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, optionIds: l.optionIds, note: l.note || undefined })),
+    };
+
+    const saveOnDevice = () => {
+      const label =
+        (orderType === "dine_in" ? tables.find((tb) => tb.id === tableId)?.label : undefined) ?? (name || t(ORDER_TYPE_LABEL[orderType]));
+      const ok = enqueue({ clientId: cartId, tenantId, queuedAt: new Date().toISOString(), input, label, total: totals.total });
+      if (!ok) return setError(t("No internet, and this browser won't save the order. Write it down for now."));
+      clearCart();
+      setSaved(t("Saved on this device: {label}, {total}. Tell the kitchen now; it's sent to the system when the internet is back.", { label, total: rm(totals.total) }));
+    };
+
+    if (!navigator.onLine) return saveOnDevice();
     start(async () => {
-      setError(undefined);
-      const r = await createCounterOrder({
-        orderType,
-        tableId: orderType === "dine_in" ? tableId || null : null,
-        customerName: name || undefined,
-        customerPhone: phone || undefined,
-        note: note || undefined,
-        lines: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, optionIds: l.optionIds, note: l.note || undefined })),
-      });
+      let r: Awaited<ReturnType<typeof createCounterOrder>>;
+      try {
+        r = await createCounterOrder({ ...input, clientId: cartId });
+      } catch {
+        // The request never got an answer (Wi-Fi with no internet, Unifi down). If it did reach
+        // the server, sending it again later with the same id just finds the same order.
+        return saveOnDevice();
+      }
       if (r?.error) setError(r.error);
       else if (r?.id) router.push(`/app/orders/${r.id}`);
     });
@@ -203,8 +239,17 @@ export function CounterOrder({
           </dl>
           <p className="text-xs text-mute">{t("Member, staff or corporate pricing is applied on the payment screen.")}</p>
           <FormError message={error} />
+          {saved ? (
+            <p role="status" className="rounded-md border-2 border-teh bg-teh-soft px-3 py-2 text-sm font-semibold text-teh">
+              {saved}
+            </p>
+          ) : null}
           <Button size="xl" className="w-full" disabled={busy || lines.length === 0} onClick={submit}>
-            {busy ? t("Sending…") : t("Send to kitchen & bill")}
+            {busy ? t("Sending…") : online ? t("Send to kitchen & bill") : (
+              <>
+                <CloudOff className="size-4" aria-hidden /> {t("Save order on this device")}
+              </>
+            )}
           </Button>
         </div>
       </aside>

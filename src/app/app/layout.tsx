@@ -5,6 +5,7 @@ import { logout } from "@/app/(auth)/actions";
 import { Nav } from "@/components/nav";
 import { Logo } from "@/components/brand";
 import { I18nProvider } from "@/components/i18n";
+import { OfflineSync } from "@/components/offline-sync";
 import { makeT } from "@/lib/i18n";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </button>
           </form>
         </header>
-        <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">{children}</main>
+        <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">
+          {user.role === "kitchen" ? null : <OfflineSync tenantId={tenant.id} />}
+          {children}
+        </main>
         <div className="fixed inset-x-0 bottom-0 z-30 md:hidden">
           <Nav role={user.role} variant="bar" />
         </div>
