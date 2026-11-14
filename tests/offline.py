@@ -52,7 +52,7 @@ def first_plain_item(page):
     tabs = page.locator("section > div.mb-4 > button")
     for i in range(tabs.count()):
         tabs.nth(i).click()
-        btn = page.locator("section button.min-h-24").filter(has_not_text="+ options")
+        btn = page.locator("section button.min-h-24").filter(has_not_text="+ options").filter(has_not_text="Key in price")
         if btn.count():
             name = btn.first.locator("span").first.inner_text()
             btn.first.click()

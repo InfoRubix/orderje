@@ -5,18 +5,23 @@ import { useRouter } from "next/navigation";
 import { CloudOff, Minus, Plus, Trash2, X } from "lucide-react";
 import type { Menu, MenuItemFull } from "@/lib/orders";
 import { computeTotals, ORDER_TYPE_LABEL } from "@/lib/pricing";
-import { rm } from "@/lib/money";
+import { rm, toSen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button, FormError, Input, Select } from "@/components/ui";
 import { useT } from "@/components/i18n";
 import { enqueue, useOnline } from "@/lib/offline-queue";
 import { createCounterOrder } from "../../actions";
 
-type Line = { key: string; item: MenuItemFull; qty: number; optionIds: string[]; note: string };
+/** price: sen typed by the cashier, only for open-price items (nasi campur). */
+type Line = { key: string; item: MenuItemFull; qty: number; optionIds: string[]; note: string; price?: number };
 type OrderType = "dine_in" | "takeaway" | "delivery";
 
-const unit = (item: MenuItemFull, ids: string[]) =>
-  item.price + ids.reduce((s, id) => s + (item.groups.flatMap((g) => g.options).find((o) => o.id === id)?.price ?? 0), 0);
+const MAX_OPEN_PRICE = 100_000; // keep in step with src/lib/orders.ts
+/** Amounts a kedai keys in most often for nasi campur; the item's usual price is added in front. */
+const QUICK_PRICES = [500, 600, 700, 800, 1000, 1200];
+
+const unit = (item: MenuItemFull, ids: string[], price?: number) =>
+  (item.openPrice ? (price ?? 0) : item.price) + ids.reduce((s, id) => s + (item.groups.flatMap((g) => g.options).find((o) => o.id === id)?.price ?? 0), 0);
 const optNames = (item: MenuItemFull, ids: string[]) =>
   ids.map((id) => item.groups.flatMap((g) => g.options).find((o) => o.id === id)?.name).filter(Boolean).join(", ");
 
@@ -50,15 +55,17 @@ export function CounterOrder({
   // One id per cart, kept through retries, so the same order can never be made twice.
   const [cartId, setCartId] = useState(() => crypto.randomUUID());
 
-  const subtotal = lines.reduce((s, l) => s + unit(l.item, l.optionIds) * l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + unit(l.item, l.optionIds, l.price) * l.qty, 0);
   const totals = computeTotals(rates, subtotal, "walk_in", orderType);
   const items = menu.find((c) => c.id === cat)?.items ?? [];
 
-  function add(item: MenuItemFull, optionIds: string[] = [], qty = 1, lineNote = "") {
+  function add(item: MenuItemFull, optionIds: string[] = [], qty = 1, lineNote = "", price?: number) {
     setLines((cur) => {
-      const same = cur.find((l) => l.item.id === item.id && l.optionIds.join() === optionIds.join() && l.note === lineNote);
+      const same = cur.find(
+        (l) => l.item.id === item.id && l.optionIds.join() === optionIds.join() && l.note === lineNote && l.price === price,
+      );
       if (same) return cur.map((l) => (l === same ? { ...l, qty: Math.min(99, l.qty + qty) } : l));
-      return [...cur, { key: crypto.randomUUID(), item, qty, optionIds, note: lineNote }];
+      return [...cur, { key: crypto.randomUUID(), item, qty, optionIds, note: lineNote, price }];
     });
   }
 
@@ -80,7 +87,13 @@ export function CounterOrder({
       customerName: name || undefined,
       customerPhone: phone || undefined,
       note: note || undefined,
-      lines: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty, optionIds: l.optionIds, note: l.note || undefined })),
+      lines: lines.map((l) => ({
+        menuItemId: l.item.id,
+        qty: l.qty,
+        optionIds: l.optionIds,
+        note: l.note || undefined,
+        price: l.item.openPrice ? l.price : undefined,
+      })),
     };
 
     const saveOnDevice = () => {
@@ -130,14 +143,18 @@ export function CounterOrder({
           {items.map((item) => (
             <button
               key={item.id}
-              onClick={() => (item.groups.length ? setPicking(item) : add(item))}
+              onClick={() => (item.groups.length || item.openPrice ? setPicking(item) : add(item))}
               className="flex min-h-24 flex-col justify-between rounded-xl border-2 border-edge bg-surface p-3 text-left hover:bg-tag-soft active:bg-pandan-soft"
             >
               <span className="font-semibold leading-snug">{item.name}</span>
-              <span className="num mt-2 text-sm font-semibold text-pandan-dark">
-                {rm(item.price)}
-                {item.groups.length ? <span className="ml-1 font-normal text-mute">{t("+ options")}</span> : null}
-              </span>
+              {item.openPrice ? (
+                <span className="mt-2 text-sm font-semibold text-teh">{t("Key in price")}</span>
+              ) : (
+                <span className="num mt-2 text-sm font-semibold text-pandan-dark">
+                  {rm(item.price)}
+                  {item.groups.length ? <span className="ml-1 font-normal text-mute">{t("+ options")}</span> : null}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -190,7 +207,7 @@ export function CounterOrder({
                 <p className="font-semibold leading-snug">{l.item.name}</p>
                 {l.optionIds.length ? <p className="text-xs text-ink-soft">{optNames(l.item, l.optionIds)}</p> : null}
                 {l.note ? <p className="text-xs italic text-ink-soft">“{l.note}”</p> : null}
-                <p className="num text-sm">{rm(unit(l.item, l.optionIds) * l.qty)}</p>
+                <p className="num text-sm">{rm(unit(l.item, l.optionIds, l.price) * l.qty)}</p>
               </div>
               <div className="flex items-center">
                 <button
@@ -258,8 +275,8 @@ export function CounterOrder({
         <OptionsDialog
           item={picking}
           onClose={() => setPicking(null)}
-          onAdd={(ids, qty, n) => {
-            add(picking, ids, qty, n);
+          onAdd={(ids, qty, n, price) => {
+            add(picking, ids, qty, n, price);
             setPicking(null);
           }}
         />
@@ -275,13 +292,20 @@ function OptionsDialog({
 }: {
   item: MenuItemFull;
   onClose: () => void;
-  onAdd: (ids: string[], qty: number, note: string) => void;
+  onAdd: (ids: string[], qty: number, note: string, price?: number) => void;
 }) {
   const t = useT();
   const [ids, setIds] = useState<string[]>([]);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState("");
+  const [priceText, setPriceText] = useState("");
+  const typed = toSen(priceText);
+  const price = item.openPrice ? typed : undefined;
+  const badPrice = item.openPrice && !(Number.isInteger(typed) && typed >= 1 && typed <= MAX_OPEN_PRICE);
+  const quick = [...new Set([item.price, ...QUICK_PRICES].filter((p) => p > 0))];
   const missing = item.groups.find((g) => g.required && !g.options.some((o) => ids.includes(o.id)));
+  const ready = !missing && !badPrice;
+  const addIt = () => ready && onAdd(ids, qty, note.trim(), price);
   const toggle = (gid: string, oid: string) => {
     const g = item.groups.find((x) => x.id === gid)!;
     const inG = g.options.map((o) => o.id);
@@ -303,6 +327,38 @@ function OptionsDialog({
           </button>
         </div>
         <div className="space-y-4">
+          {item.openPrice ? (
+            <div>
+              <label htmlFor="open-price" className="mb-2 block text-sm font-semibold">
+                {t("Price (RM)")}
+              </label>
+              <Input
+                id="open-price"
+                autoFocus
+                value={priceText}
+                onChange={(e) => setPriceText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addIt()}
+                inputMode="decimal"
+                placeholder="8.50"
+                className="num h-14 text-2xl"
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {quick.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPriceText((p / 100).toFixed(2))}
+                    aria-pressed={typed === p}
+                    className={cn(
+                      "num rounded-lg border px-3 py-2 text-sm font-semibold",
+                      typed === p ? "border-pandan bg-pandan-soft text-pandan-dark" : "border-line",
+                    )}
+                  >
+                    {(p / 100).toFixed(2)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {item.groups.map((g) => (
             <div key={g.id}>
               <p className="mb-2 text-sm font-semibold">
@@ -326,7 +382,11 @@ function OptionsDialog({
               </div>
             </div>
           ))}
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Kitchen note")} />
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={item.openPrice ? t("What's on the plate (optional)") : t("Kitchen note")}
+          />
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-md border-2 border-edge">
               <button className="grid size-10 place-items-center" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={t("Less")}>
@@ -337,8 +397,12 @@ function OptionsDialog({
                 <Plus className="size-4" />
               </button>
             </div>
-            <Button size="lg" className="flex-1" disabled={!!missing} onClick={() => onAdd(ids, qty, note.trim())}>
-              {missing ? t("Choose {name}", { name: missing.name }) : t("Add · {amount}", { amount: rm(unit(item, ids) * qty) })}
+            <Button size="lg" className="flex-1" disabled={!ready} onClick={addIt}>
+              {missing
+                ? t("Choose {name}", { name: missing.name })
+                : badPrice
+                  ? t("Enter the price")
+                  : t("Add · {amount}", { amount: rm(unit(item, ids, price) * qty) })}
             </Button>
           </div>
         </div>

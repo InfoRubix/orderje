@@ -34,12 +34,16 @@ export async function listMenuItems(tenantId: string) {
     .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
 }
 
-export async function loadMenu(tenantId: string, opts: { includeUnavailable?: boolean } = {}) {
+export async function loadMenu(tenantId: string, opts: { includeUnavailable?: boolean; forCustomers?: boolean } = {}) {
   const [cats, items] = await Promise.all([listCategories(tenantId), listMenuItems(tenantId)]);
   return cats
     .map((c: Category) => ({
       ...c,
-      items: items.filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available)),
+      items: items
+        .filter((i) => i.categoryId === c.id && (opts.includeUnavailable || i.available))
+        // Customers can't set their own price, so open-price items stay at the counter.
+        .filter((i) => !(opts.forCustomers && i.openPrice))
+        .map((i) => ({ ...i, openPrice: i.openPrice ?? false })),
     }))
     .filter((c) => opts.includeUnavailable || c.items.length > 0);
 }
@@ -49,7 +53,17 @@ export type MenuItemFull = Menu[number]["items"][number];
 
 /* --------------------------------- Orders --------------------------------- */
 
-export type OrderLineInput = { menuItemId: string; qty: number; optionIds: string[]; note?: string };
+export type OrderLineInput = {
+  menuItemId: string;
+  qty: number;
+  optionIds: string[];
+  note?: string;
+  /** Sen, typed by the cashier. Used only for open-price items; ignored for everything else. */
+  price?: number;
+};
+
+/** Highest price the counter may type for one open-price item. */
+export const MAX_OPEN_PRICE = 100_000; // RM 1,000
 
 export type CreateOrderInput = {
   tenantId: string;
@@ -72,7 +86,11 @@ export type CreateOrderInput = {
 };
 
 /** Prices every line from the database, never from the client. */
-async function priceLines(tenantId: string, lines: OrderLineInput[], opts: { allowSoldOut?: boolean } = {}) {
+async function priceLines(
+  tenantId: string,
+  lines: OrderLineInput[],
+  opts: { allowSoldOut?: boolean; source: "qr" | "counter" },
+) {
   if (!lines.length) throw new OrderError("Add at least one item.");
   if (lines.length > 100) throw new OrderError("Too many items in one order.");
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))];
@@ -99,7 +117,14 @@ async function priceLines(tenantId: string, lines: OrderLineInput[], opts: { all
       if (g.required && n === 0) throw new OrderError("Choose {group} for {name}.", { group: g.name, name: item.name });
       if (n > g.maxSelect) throw new OrderError("Pick up to {max} for {group}.", { max: g.maxSelect, group: g.name });
     }
-    const unitPrice = item.price + chosen.reduce((s, c) => s + c.o.price, 0);
+    let base = item.price;
+    if (item.openPrice) {
+      if (opts.source !== "counter") throw new OrderError("{name} is priced at the counter. Please order it there.", { name: item.name });
+      const p = Number(l.price);
+      if (!Number.isInteger(p) || p < 1 || p > MAX_OPEN_PRICE) throw new OrderError("Enter the price for {name}.", { name: item.name });
+      base = p;
+    }
+    const unitPrice = base + chosen.reduce((s, c) => s + c.o.price, 0);
     return {
       id: uid(),
       menuItemId: item.id,
@@ -141,7 +166,7 @@ export async function createOrder(input: CreateOrderInput) {
   const existing = read<Order>(await orderRef.get());
   if (existing) return { id: existing.id, publicToken: existing.publicToken };
 
-  const items = await priceLines(tenant.id, input.lines, { allowSoldOut: Boolean(input.queuedAt) });
+  const items = await priceLines(tenant.id, input.lines, { allowSoldOut: Boolean(input.queuedAt), source: input.source });
   const subtotal = items.reduce((s, l) => s + l.lineTotal, 0);
   const totals = computeTotals(tenant, subtotal, customerType, input.orderType);
 

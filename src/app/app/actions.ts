@@ -25,6 +25,7 @@ import {
   createOrder,
   getOrderRow,
   OrderError,
+  MAX_OPEN_PRICE,
   outstandingCredit,
   payAtCounter,
   setOrderCustomer,
@@ -117,6 +118,8 @@ const counterOrderSchema = z.object({
         qty: z.number().int().min(1).max(99),
         optionIds: z.array(z.string().max(36)).max(20),
         note: z.string().max(160).optional(),
+        /** Sen, for open-price items such as nasi campur. */
+        price: z.number().int().min(1).max(MAX_OPEN_PRICE).optional(),
       }),
     )
     .min(1, "Add at least one item.")
@@ -274,6 +277,8 @@ const itemSchema = z.object({
   categoryId: z.string().min(1, "Pick a category.").max(36),
   description: z.string().max(255).optional(),
   available: z.boolean(),
+  /** Price typed at the counter for each order; `price` is then an optional usual price. */
+  openPrice: z.boolean().optional(),
   groups: z
     .array(
       z.object({
@@ -299,8 +304,9 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
   const t = makeT(tenant.language);
   try {
     const d = itemSchema.parse(JSON.parse(String(f.get("data") ?? "{}")));
-    const price = toSen(d.price);
-    if (!Number.isFinite(price) || price <= 0) return { error: t("Enter a price, e.g. 8.50.") };
+    const openPrice = d.openPrice ?? false;
+    const price = openPrice && !d.price.trim() ? 0 : toSen(d.price);
+    if (!Number.isFinite(price) || price < 0 || (!openPrice && price === 0)) return { error: t("Enter a price, e.g. 8.50.") };
     if (!(await col.of(tenant.id, "categories").doc(d.categoryId).get()).exists) return { error: t("Pick a category.") };
     const items = col.of(tenant.id, "menuItems");
     const id = d.id || uid();
@@ -337,6 +343,7 @@ export async function saveItem(f: FormData): Promise<ActionResult> {
       categoryId: d.categoryId,
       description: d.description?.trim() || null,
       available: d.available,
+      openPrice,
       groups,
       ...image,
     };

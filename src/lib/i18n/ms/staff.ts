@@ -110,6 +110,9 @@ const dict: Record<string, string> = {
     "Harga ahli, staf atau korporat dikira di skrin bayaran.",
   "Sending…": "Menghantar…",
   "Send to kitchen & bill": "Hantar ke dapur & bil",
+  "Key in price": "Taip harga",
+  "Enter the price": "Masukkan harga",
+  "What's on the plate (optional)": "Lauk apa dalam pinggan (pilihan)",
 
   // offline counter orders
   "Save order on this device": "Simpan pesanan dalam peranti ini",

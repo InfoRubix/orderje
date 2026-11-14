@@ -36,7 +36,7 @@ export default async function TablePage({ params }: { params: Promise<{ slug: st
     );
   }
 
-  const menu = await loadMenu(tenant.id);
+  const menu = await loadMenu(tenant.id, { forCustomers: true });
   return (
     <I18nProvider lang={tenant.language}>
       <CustomerMenu

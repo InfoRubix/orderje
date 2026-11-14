@@ -87,6 +87,12 @@ const dict: Record<string, string> = {
   "Shown under the name on the customer menu": "Keluar di bawah nama item di menu pelanggan",
   "What's in it, how spicy, portion size": "Apa ada di dalam, pedas mana, saiz hidangan",
   "Sold out for now": "Habis buat masa ini",
+  "Usual price (RM, optional)": "Harga biasa (RM, pilihan)",
+  "Price keyed in at the counter": "Harga ditaip di kaunter",
+  "For nasi campur or lauk by the portion: the cashier types the amount for each order. Not shown on the QR menu.":
+    "Untuk nasi campur atau lauk ikut bahagian: juruwang taip harga untuk setiap pesanan. Tidak dipaparkan di menu QR.",
+  "Price at counter": "Harga di kaunter",
+  "Price at counter (usually {price})": "Harga di kaunter (biasanya {price})",
   "Add-ons & choices": "Tambahan & pilihan",
   "Group, e.g. Panas / Ais": "Kumpulan, cth. Panas / Ais",
   "Group name": "Nama kumpulan",

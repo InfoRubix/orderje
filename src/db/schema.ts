@@ -95,7 +95,13 @@ export type MenuItem = {
   categoryId: string;
   name: string;
   description: string | null;
+  /** In sen. For an open-price item, the usual price shown as a hint at the counter (0 = none). */
   price: number;
+  /**
+   * The cashier types the price for each order (nasi campur, lauk by the portion). Counter only:
+   * these items are hidden from the QR menu. Missing on older items = false.
+   */
+  openPrice?: boolean;
   imageUrl: string | null;
   imagePath: string | null;
   available: boolean;
