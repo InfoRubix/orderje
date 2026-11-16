@@ -65,7 +65,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-4">
           <Card className="p-5">
             <ul className="divide-y divide-line">

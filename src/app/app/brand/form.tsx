@@ -53,7 +53,7 @@ export function BrandForm({ brand, sample }: { brand: Brand; sample: Sample[] })
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <form
         onSubmit={keep((f) => {
           if (logo) f.set("logo", logo);
