@@ -154,7 +154,7 @@ export function CounterOrder({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section>
         <h1 className="mb-4 font-display text-2xl font-bold md:text-3xl">{t("New order")}</h1>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">

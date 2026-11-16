@@ -84,7 +84,7 @@ export function CallingBoard({ shop }: { shop: string }) {
         </div>
       </div>
       {offline ? <p className="mb-3 font-semibold text-chili">{t("Connection lost, retrying…")}</p> : null}
-      <div className="grid flex-1 gap-4 md:grid-cols-[2fr_3fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] flex-1 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <section className="rounded-xl border-4 border-edge bg-surface p-4" aria-label={t("Being made")}>
           <h2 className="mb-3 font-display text-2xl text-ink-soft md:text-3xl">{t("Being made")}</h2>
           <ul className="flex flex-wrap gap-3">

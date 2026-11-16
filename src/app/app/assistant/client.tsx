@@ -141,7 +141,7 @@ export function Assistant({ categories, left: initialLeft, limit }: { categories
         }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* ------------------------------------------------ chat */}
         <Card className="flex min-h-[560px] flex-col overflow-hidden lg:sticky lg:top-6 lg:h-[calc(100dvh-9rem)]">
           <div className="flex-1 space-y-4 overflow-y-auto p-4">

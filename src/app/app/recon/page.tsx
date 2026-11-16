@@ -42,7 +42,7 @@ export default async function ReconPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3">

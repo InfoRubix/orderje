@@ -69,7 +69,7 @@ export function MenuEditor({ categories }: { categories: EditorCategory[] }) {
           </Button>
         }
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-5">
           {categories.length === 0 ? (
             <Empty title={t("Start with a category")}>{t("Add one on the right, like “Nasi”, “Roti” or “Minuman”.")}</Empty>

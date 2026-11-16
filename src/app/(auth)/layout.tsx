@@ -18,7 +18,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
   const t = makeT(lang);
   return (
     <I18nProvider lang={lang}>
-    <main className="grid min-h-dvh md:grid-cols-[1fr_minmax(0,520px)]">
+    <main className="grid grid-cols-[minmax(0,1fr)] min-h-dvh md:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
       <section className="relative hidden overflow-hidden border-r-[6px] border-[#24211d] bg-sign text-cream md:flex md:flex-col">
         <Awning id="awning-auth" className="h-10 shrink-0" />
         <div className="h-0.5 shrink-0 bg-[#24211d]" />
